@@ -1,0 +1,332 @@
+Part 3 — Deployment Steps
+3.1 Prerequisites
+    Docker + Docker Compose
+    A server (VPS or cloud) with 4 vCPU / 8 GB RAM minimum
+    A domain name (for HTTPS)
+    OpenAI API key
+
+3.2 Local deployment (dev)
+bash
+        # 1. Extract / generate project
+        cd ai-tutor
+
+        # 2. Configure environment
+        cp .env.example .env
+        # Edit .env: set SECRET_KEY and OPENAI_API_KEY
+
+        # 3. Build and start
+        docker compose up --build -d
+
+        # 4. Run migrations
+        docker compose exec backend alembic upgrade head
+
+        # 5. Verify
+        curl http://localhost:8000/health
+        # → {"status":"ok","env":"production"}
+
+        # 6. Open UI
+        open http://localhost:3000
+3.3 Production deployment on a VPS (Ubuntu 22.04)
+Step 1 — Provision server
+    bash
+        # On your laptop
+        ssh root@YOUR_SERVER_IP
+
+        # On the server
+        apt update && apt upgrade -y
+        apt install -y docker.io docker-compose-plugin nginx certbot python3-certbot-nginx git
+        systemctl enable --now docker
+Step 2 — Create a non-root user
+    bash
+        adduser tutor
+        usermod -aG docker tutor
+        su - tutor
+Step 3 — Clone the project
+    bash
+        git clone https://github.com/you/ai-tutor.git
+        cd ai-tutor
+Step 4 — Configure .env for production
+    bash
+        cp .env.example .env
+        nano .env
+
+Set:
+env
+        ENV=production
+        DEBUG=false
+        SECRET_KEY=<64-char random>
+        DATABASE_URL=postgresql+asyncpg://tutor:<strong-pw>@postgres:5432/tutor
+        REDIS_URL=redis://redis:6379/0
+        OPENAI_API_KEY=sk-...
+        CORS_ORIGINS=["https://yourdomain.com"]
+        Generate a strong SECRET_KEY:
+
+
+    bash
+        openssl rand -hex 32
+
+
+Step 5 — Add production override
+Create docker-compose.prod.yml:
+yaml
+        version: "3.9"
+        services:
+          postgres:
+            restart: always
+            environment:
+              POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+          redis:
+            restart: always
+          backend:
+            restart: always
+            environment:
+              ENV: production
+          worker:
+            restart: always
+          frontend:
+            restart: always
+            environment:
+              NEXT_PUBLIC_API_URL: https://yourdomain.com/api/v1
+
+
+Step 6 — Start the stack
+    bash
+        docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+        docker compose exec backend alembic upgrade head
+
+Step 7 — Nginx reverse proxy
+        Create /etc/nginx/sites-available/ai-tutor:
+
+nginx
+        server {
+            listen 80;
+            server_name yourdomain.com;
+
+            client_max_body_size 20M;
+
+            location /api/ {
+                proxy_pass http://127.0.0.1:8000/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_read_timeout 300s;
+                proxy_buffering off;   # for SSE streaming
+            }
+
+            location / {
+                proxy_pass http://127.0.0.1:3000;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+        }
+
+Enable:
+
+    bash
+        ln -s /etc/nginx/sites-available/ai-tutor /etc/nginx/sites-enabled/
+        nginx -t && systemctl reload nginx
+
+Step 8 — HTTPS with Let's Encrypt
+    bash
+        certbot --nginx -d yourdomain.com
+
+Auto-renewal is installed by default. Verify:
+
+    bash
+        certbot renew --dry-run
+        3.4 Managed cloud deployment
+        Option A — AWS (ECS Fargate)
+        Build images → push to ECR
+
+    bash
+        aws ecr create-repository --repository-name ai-tutor-backend
+        docker build -t ai-tutor-backend ./backend
+        docker tag ai-tutor-backend:latest <acct>.dkr.ecr.<region>.amazonaws.com/ai-tutor-backend:latest
+        docker push <acct>.dkr.ecr.<region>.amazonaws.com/ai-tutor-backend:latest
+
+Provision RDS Postgres with pgvector
+Provision ElastiCache Redis
+Deploy ECS services for backend, worker, frontend
+Use ALB for routing + ACM for HTTPS
+Store secrets in AWS Secrets Manager
+Logs to CloudWatch
+
+
+
+Option B — GCP (Cloud Run)
+    bash
+        gcloud run deploy ai-tutor-backend \
+          --source ./backend \
+          --region asia-south1 \
+          --set-env-vars DATABASE_URL=...,REDIS_URL=...,OPENAI_API_KEY=...
+
+Use Cloud SQL (Postgres + pgvector), Memorystore Redis, Firebase Hosting or Cloud Run for frontend.
+
+Option C — DigitalOcean App Platform
+        Connect GitHub repo
+        Add backend + frontend + worker as separate components
+        Add a Managed Postgres (with pgvector enabled) + Managed Redis
+        Set env vars in the App Platform UI
+        Deploy — DO handles HTTPS + scaling
+
+Option D — Render / Railway / Fly.io
+        Deploy backend, worker, frontend as three services
+        Use their managed Postgres + Redis add-ons
+        Point NEXT_PUBLIC_API_URL to backend public URL
+        Add alembic upgrade head as a release command
+
+3.5 Kubernetes (when you outgrow single server)
+    bash
+        kubectl apply -f infra/k8s/namespace.yaml
+        kubectl apply -f infra/k8s/secrets.yaml
+        kubectl apply -f infra/k8s/postgres.yaml
+        kubectl apply -f infra/k8s/redis.yaml
+        kubectl apply -f infra/k8s/backend.yaml
+        kubectl apply -f infra/k8s/worker.yaml
+        kubectl apply -f infra/k8s/frontend.yaml
+        kubectl apply -f infra/k8s/ingress.yaml
+
+Use:
+    cert-manager for TLS
+    external-secrets for secrets
+    HPA for autoscaling on CPU + request rate
+    Ingress-nginx or Traefik for routing
+
+Part 4 — CI/CD (GitHub Actions)
+.github/workflows/deploy.yml:
+
+                name: Deploy
+
+                on:
+                  push:
+                    branches: [main]
+
+                jobs:
+                  test:
+                    runs-on: ubuntu-latest
+                    steps:
+                      - uses: actions/checkout@v4
+                      - uses: actions/setup-python@v5
+                        with: {python-version: "3.11"}
+                      - run: |
+                          cd backend
+                          pip install -e ".[dev]"
+                          pytest -q
+
+                  build-and-push:
+                    needs: test
+                    runs-on: ubuntu-latest
+                    steps:
+                      - uses: actions/checkout@v4
+                      - uses: docker/login-action@v3
+                        with:
+                          registry: ghcr.io
+                          username: ${{ github.actor }}
+                          password: ${{ secrets.GITHUB_TOKEN }}
+                      - uses: docker/build-push-action@v6
+                        with:
+                          context: ./backend
+                          push: true
+                          tags: ghcr.io/${{ github.repository }}/backend:latest
+                      - uses: docker/build-push-action@v6
+                        with:
+                          context: ./frontend
+                          push: true
+                          tags: ghcr.io/${{ github.repository }}/frontend:latest
+
+                  deploy:
+                    needs: build-and-push
+                    runs-on: ubuntu-latest
+                    steps:
+                      - name: SSH deploy
+                        uses: appleboy/ssh-action@v1
+                        with:
+                          host: ${{ secrets.SERVER_HOST }}
+                          username: ${{ secrets.SERVER_USER }}
+                          key: ${{ secrets.SSH_KEY }}
+                          script: |
+                            cd /home/tutor/ai-tutor
+                            git pull
+                            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+                            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+                            docker compose exec -T backend alembic upgrade head
+
+
+
+Set these secrets in GitHub:
+
+    SERVER_HOST
+    SERVER_USER
+    SSH_KEY
+
+
+
+Part 5 — Post-Deploy Checklist
+Security
+    □ SECRET_KEY is 64+ random chars, not in git
+    □ .env is not committed
+    □ HTTPS enforced, HTTP redirects to HTTPS
+    □ CORS limited to your domain
+    □ Postgres not exposed to public internet
+    □ Redis not exposed
+    □ Rate limiting enabled
+    □ JWT expiry short (≤ 60 min access, ≤ 30 d refresh)
+    □ Password hashing with bcrypt
+    □ PII redaction active
+Reliability
+    □ DB migrations run automatically on deploy
+    □ Health check at /health
+    □ Postgres backups scheduled (daily + weekly + monthly)
+    □ Redis persistence enabled (appendonly yes)
+    □ Logs centralized (Loki / CloudWatch / Datadog)
+    □ Alerts on 5xx rate + latency
+Performance
+    □ pgvector index (ivfflat or hnsw) created
+    □ Redis caching for hot retrievals
+    □ Backend runs ≥ 2 workers behind ALB/Nginx
+    □ Frontend built with production optimizations
+    □ LLM responses streamed (SSE)
+Compliance (children's data)
+    □ Parental consent captured at signup
+    □ Audit logs of all admin/teacher actions
+    □ Data export + delete endpoints
+    □ DPDP / COPPA notice in ToS
+    □ Content moderation on inputs and outputs
+    □ Safety flags table populated and reviewed
+
+
+Part 6 — Quick Reference Commands
+bash
+        # Start everything
+        docker compose up -d --build
+        # See logs
+        docker compose logs -f backend
+        # Run migrations
+        docker compose exec backend alembic upgrade head
+        # Open a psql shell
+        docker compose exec postgres psql -U tutor -d tutor
+        # Restart one service
+        docker compose restart backend
+        # Scale workers
+        docker compose up -d --scale worker=4
+        # Backup DB
+        docker compose exec postgres pg_dump -U tutor tutor > backup_$(date +%F).sql
+        # Restore DB
+        cat backup.sql | docker compose exec -T postgres psql -U tutor tutor
+
+
+Part 7 — Fastest Path From Here
+        Run the bootstrap script → you have the folder tree.
+        Copy the backend files I gave in earlier messages into their paths.
+        Copy the frontend files into their paths.
+        cp .env.example .env and add your OPENAI_API_KEY.
+        docker compose up --build
+        Register a user via POST /api/v1/auth/register.
+        Ingest one section via POST /api/v1/ingest/section.
+        Open http://localhost:3000/tutor and ask a question.
+
+
+That's your working tutor, running locally. Then follow Section 3.3 to put it on a server with HTTPS
+

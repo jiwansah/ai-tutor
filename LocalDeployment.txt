@@ -1,0 +1,11 @@
+
+
+Verify installs
+    git --version
+    node --version      # v20.x or higher
+    python3 --version   # 3.11.x or higher
+    docker --version
+    docker compose version
+
+
+
