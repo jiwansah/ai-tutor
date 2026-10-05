@@ -1,0 +1,13 @@
+from app.db.models.user import User, UserRole
+from app.db.models.curriculum import School, Class, Subject, Book, Chapter, Section
+from app.db.models.content import ContentChunk
+from app.db.models.student import StudentProfile, ConceptMastery
+from app.db.models.session import TutorSession, Message, Attempt
+
+__all__ = [
+    "User", "UserRole",
+    "School", "Class", "Subject", "Book", "Chapter", "Section",
+    "ContentChunk",
+    "StudentProfile", "ConceptMastery",
+    "TutorSession", "Message", "Attempt",
+]

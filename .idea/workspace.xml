@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="793bdd69-6b2b-456c-8d48-665aff220580" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/ai-tutor-backend.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/alembic.ini" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/alembic/script.py.mako" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/agents/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/api/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/api/v1/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/core/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/db/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/db/models/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/prompts/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/repositories/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/schemas/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/services/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/tools/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/workers/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/.dockerignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/.env.local" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/next-env.d.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/next.config.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/postcss.config.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/public/.gitkeep" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/app/(auth)/login/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/app/(auth)/register/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/app/(tutor)/dashboard/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/app/(tutor)/progress/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/app/globals.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/app/layout.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/src/app/page.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/tailwind.config.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/frontend/tsconfig.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.example" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/1" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/LocalDeployment.txt" beforeDir="false" afterPath="$PROJECT_DIR$/LocalDeployment.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/backend/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/alembic/env.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/alembic/env.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/api/router.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/router.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/api/v1/auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/v1/auth.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/api/v1/curriculum.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/v1/curriculum.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/api/v1/dashboard.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/v1/dashboard.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/api/v1/ingest.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/v1/ingest.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/api/v1/tutor.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/v1/tutor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/core/security.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/core/security.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/db/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/db/base.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/db/models/content.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/db/models/content.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/db/models/curriculum.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/db/models/curriculum.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/db/models/session.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/db/models/session.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/db/models/student.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/db/models/student.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/db/models/user.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/db/models/user.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/db/session.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/db/session.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/prompts/teacher.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/prompts/teacher.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/repositories/content_repo.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/repositories/content_repo.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/repositories/session_repo.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/repositories/session_repo.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/repositories/student_repo.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/repositories/student_repo.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/repositories/user_repo.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/repositories/user_repo.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/schemas/auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/schemas/auth.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/embedding_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/embedding_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/knowledge_tracing.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/knowledge_tracing.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/llm_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/llm_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/rag_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/rag_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/safety_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/safety_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/spaced_repetition.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/spaced_repetition.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/tutor_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/tutor_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/(tutor)/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/(tutor)/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/(tutor)/tutor/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/(tutor)/tutor/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/components/tutor/ChatWindow.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/tutor/ChatWindow.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/components/tutor/MessageBubble.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/tutor/MessageBubble.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/components/tutor/ModeSelector.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/tutor/ModeSelector.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/hooks/useTutor.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/hooks/useTutor.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/lib/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/lib/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/lib/store.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/lib/store.ts" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 1,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3KE8XsJaI29aL6NVOpqSq48FZ2c" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "/Users/saurabhranjan/Jiwan/Python/PythonProject/ai-tutor/ai-tutor",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.jshint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.jshint": "",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm"
+  }
+}]]></component>
+  <component name="RunManager">
+    <configuration default="true" type="PythonConfigurationType" factoryName="Python">
+      <module name="ai-tutor" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="DEBUG_JUST_MY_CODE" value="false" />
+      <option name="RUN_TOOL" value="" />
+      <option name="SCRIPT_NAME" value="" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="Tox" factoryName="Tox">
+      <module name="ai-tutor" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="DEBUG_JUST_MY_CODE" value="false" />
+      <option name="RUN_TOOL" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="docs" factoryName="Docutils task">
+      <module name="ai-tutor" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="DEBUG_JUST_MY_CODE" value="false" />
+      <option name="RUN_TOOL" value="" />
+      <option name="docutils_input_file" value="" />
+      <option name="docutils_output_file" value="" />
+      <option name="docutils_params" value="" />
+      <option name="docutils_task" value="" />
+      <option name="docutils_open_in_browser" value="false" />
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="docs" factoryName="Sphinx task">
+      <module name="ai-tutor" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="DEBUG_JUST_MY_CODE" value="false" />
+      <option name="RUN_TOOL" value="" />
+      <option name="docutils_input_file" value="" />
+      <option name="docutils_output_file" value="" />
+      <option name="docutils_params" value="" />
+      <option name="docutils_task" value="" />
+      <option name="docutils_open_in_browser" value="false" />
+      <method v="2" />
+    </configuration>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-821f704e66d9-5bd6d13a2a75-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-262.9437.214" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="793bdd69-6b2b-456c-8d48-665aff220580" name="Changes" comment="" />
+      <created>1791111409268</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1791111409268</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

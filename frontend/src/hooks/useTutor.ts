@@ -1,28 +1,47 @@
 "use client";
 import { useState } from "react";
-import { askTutor } from "@/lib/api";
 import { useTutorStore } from "@/lib/store";
-import { toast } from "sonner";
+import { useTutorStream, type Citation, type Verification } from "./useTutorStream";
 
 export function useTutor() {
+  const {
+    messages,
+    addMessage,
+    sessionId,
+    setSession,
+    appendToLastTutor,
+    setCitationsOnLastTutor,
+    setVerificationOnLastTutor,
+  } = useTutorStore();
+  const { stream, isStreaming } = useTutorStream();
   const [loading, setLoading] = useState(false);
-  const { messages, addMessage, sessionId, setSession } = useTutorStore();
 
-  async function ask(question: string, opts: { mode?: string; subject_id?: string } = {}) {
+  async function ask(question: string, opts: { mode?: string; section_id?: string } = {}) {
     if (!question.trim()) return;
+
     addMessage({ role: "user", content: question });
+    addMessage({ role: "tutor", content: "" });
     setLoading(true);
-    try {
-      const res = await askTutor({ question, session_id: sessionId ?? undefined, ...opts });
-      if (!sessionId) setSession(res.session_id);
-      addMessage({ role: "tutor", content: res.answer, citations: res.citations });
-      return res;
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
+
+    await stream(
+      {
+        question,
+        session_id: sessionId ?? undefined,
+        mode: opts.mode ?? "teacher",
+        section_id: opts.section_id,
+      },
+      {
+        onSession: (id) => { if (!sessionId) setSession(id); },
+        onToken: (text) => appendToLastTutor(text),
+        onCitations: (citations: Citation[]) => setCitationsOnLastTutor(citations),
+        onVerification: (v: Verification) => setVerificationOnLastTutor(v),
+        onDone: () => setLoading(false),
+        onError: () => setLoading(false),
+      },
+    );
+
+    setLoading(false);
   }
 
-  return { messages, ask, loading };
+  return { messages, ask, loading: loading || isStreaming };
 }

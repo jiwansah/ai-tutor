@@ -1,18 +1,24 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useAuth } from "@/lib/store";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/tutor", label: "Tutor" },
-  { href: "/practice", label: "Practice" },
   { href: "/progress", label: "Progress" },
 ];
 
 export default function TutorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, logout } = useAuth();
+
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    if (!token) router.push("/login");
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -38,9 +44,12 @@ export default function TutorLayout({ children }: { children: React.ReactNode })
           </nav>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-600">{user?.full_name}</span>
+          <span className="text-sm text-gray-600">{user?.full_name || "Student"}</span>
           <button
-            onClick={logout}
+            onClick={() => {
+              logout();
+              router.push("/login");
+            }}
             className="text-sm text-red-600 hover:underline"
           >
             Logout

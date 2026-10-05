@@ -1,12 +1,14 @@
 "use client";
 
 const MODES = [
-  { id: "teacher", label: "👨‍🏫 Teacher" },
+  { id: "teacher",  label: "👨‍🏫 Teacher" },
   { id: "socratic", label: "🧠 Socratic" },
+  { id: "hint",     label: "💡 Hint" },
   { id: "practice", label: "🧩 Practice" },
-  { id: "exam", label: "📝 Exam" },
   { id: "revision", label: "🎯 Revision" },
-  { id: "doubt", label: "🔍 Doubt" },
+  { id: "doubt",    label: "🔍 Doubt" },
+  { id: "exam",     label: "📝 Exam" },
+  { id: "quiz",     label: "⚡ Quiz" },
 ];
 
 export function ModeSelector({

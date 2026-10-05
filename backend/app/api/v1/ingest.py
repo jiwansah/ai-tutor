@@ -1,13 +1,13 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, Form, HTTPException
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.db.models.user import User
-from app.deps import require_role
-from app.db.models.curriculum import Chapter, Section, Book
+from app.db.models.curriculum import Section
 from app.db.models.content import ContentChunk
-from app.services.ingest_service import chunk_section_text
+from app.repositories.content_repo import ContentRepository
+from app.api.v1.tutor import current_user
+from app.db.models.user import User
 from app.services.embedding_service import embed_batch
 
 router = APIRouter()
@@ -17,25 +17,32 @@ router = APIRouter()
 async def ingest_section(
     section_id: str = Form(...),
     text: str = Form(...),
-    user: User = Depends(require_role("teacher", "admin")),
+    _: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    section = (await db.execute(select(Section).where(Section.id == section_id))).scalar_one_or_none()
+    section = (await db.execute(
+        select(Section).where(Section.id == section_id)
+    )).scalar_one_or_none()
     if not section:
         raise HTTPException(404, "Section not found")
 
-    chunks = chunk_section_text(text)  # returns list[dict(text, type, page)]
-    embeddings = embed_batch([c["text"] for c in chunks])
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    if not paragraphs:
+        raise HTTPException(400, "No content")
 
-    for c, emb in zip(chunks, embeddings):
-        db.add(ContentChunk(
+    embeddings = await embed_batch(paragraphs)
+
+    chunks = []
+    for para, emb in zip(paragraphs, embeddings):
+        chunks.append(ContentChunk(
             section_id=section.id,
-            chunk_type=c.get("type", "concept"),
-            text=c["text"],
-            page=c.get("page"),
+            chunk_type="concept",
+            text=para,
+            page=section.start_page,
             embedding=emb,
             meta={},
         ))
 
+    await ContentRepository(db).bulk_insert(chunks)
     await db.commit()
-    return {"ingested": len(chunks), "section_id": section_id}
+    return {"ingested": len(chunks), "dim": len(embeddings[0]) if embeddings else 0}

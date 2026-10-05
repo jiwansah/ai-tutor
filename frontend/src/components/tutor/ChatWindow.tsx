@@ -16,7 +16,7 @@ export function ChatWindow() {
   }, [messages, loading]);
 
   async function handleSend() {
-    if (!input.trim()) return;
+    if (!input.trim() || loading) return;
     const q = input;
     setInput("");
     await ask(q, { mode });
@@ -39,17 +39,20 @@ export function ChatWindow() {
             <p className="text-sm mt-2">I'll teach you step by step</p>
           </div>
         )}
-        {messages.map((m, i) => (
-          <MessageBubble key={i} role={m.role} content={m.content} citations={m.citations} />
-        ))}
-        {loading && (
-          <div className="flex items-center gap-2 text-gray-400 text-sm">
-            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" />
-            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce [animation-delay:0.15s]" />
-            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce [animation-delay:0.3s]" />
-            <span className="ml-2">Thinking...</span>
-          </div>
-        )}
+        {messages.map((m, i) => {
+          const isLastTutor =
+            m.role === "tutor" && i === messages.length - 1 && loading;
+          return (
+            <MessageBubble
+              key={i}
+              role={m.role}
+              content={m.content}
+              citations={m.citations}
+              verification={m.verification}
+              streaming={isLastTutor}
+            />
+          );
+        })}
         <div ref={bottomRef} />
       </div>
 
@@ -66,7 +69,8 @@ export function ChatWindow() {
             }}
             placeholder="Ask a question… (Shift+Enter for new line)"
             rows={2}
-            className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            disabled={loading}
+            className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
           />
           <button
             onClick={handleSend}

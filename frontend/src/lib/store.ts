@@ -14,22 +14,45 @@ export const useAuth = create<AuthState>()(
       token: null,
       user: null,
       setAuth: (token, user) => {
-        localStorage.setItem("access_token", token);
+        if (typeof window !== "undefined") localStorage.setItem("access_token", token);
         set({ token, user });
       },
       logout: () => {
-        localStorage.removeItem("access_token");
+        if (typeof window !== "undefined") localStorage.removeItem("access_token");
         set({ token: null, user: null });
       },
     }),
-    { name: "auth-store" }
-  )
+    { name: "auth-store" },
+  ),
 );
+
+export interface Citation {
+  chapter: string;
+  section: string;
+  page: number;
+}
+
+export interface Verification {
+  verified: boolean | null;
+  sympy_solutions?: string[];
+  llm_answer?: string | null;
+  reason?: string;
+}
+
+export interface ChatMessage {
+  role: "user" | "tutor";
+  content: string;
+  citations?: Citation[];
+  verification?: Verification;
+}
 
 interface TutorState {
   sessionId: string | null;
-  messages: { role: "user" | "tutor"; content: string; citations?: any[] }[];
-  addMessage: (m: TutorState["messages"][number]) => void;
+  messages: ChatMessage[];
+  addMessage: (m: ChatMessage) => void;
+  appendToLastTutor: (text: string) => void;
+  setCitationsOnLastTutor: (citations: Citation[]) => void;
+  setVerificationOnLastTutor: (v: Verification) => void;
   setSession: (id: string) => void;
   reset: () => void;
 }
@@ -37,7 +60,45 @@ interface TutorState {
 export const useTutorStore = create<TutorState>((set) => ({
   sessionId: null,
   messages: [],
+
   addMessage: (m) => set((s) => ({ messages: [...s.messages, m] })),
+
+  appendToLastTutor: (text) =>
+    set((s) => {
+      const msgs = [...s.messages];
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === "tutor") {
+          msgs[i] = { ...msgs[i], content: msgs[i].content + text };
+          break;
+        }
+      }
+      return { messages: msgs };
+    }),
+
+  setCitationsOnLastTutor: (citations) =>
+    set((s) => {
+      const msgs = [...s.messages];
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === "tutor") {
+          msgs[i] = { ...msgs[i], citations };
+          break;
+        }
+      }
+      return { messages: msgs };
+    }),
+
+  setVerificationOnLastTutor: (verification) =>
+    set((s) => {
+      const msgs = [...s.messages];
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === "tutor") {
+          msgs[i] = { ...msgs[i], verification };
+          break;
+        }
+      }
+      return { messages: msgs };
+    }),
+
   setSession: (id) => set({ sessionId: id }),
   reset: () => set({ sessionId: null, messages: [] }),
 }));

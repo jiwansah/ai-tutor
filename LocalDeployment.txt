@@ -9,3 +9,87 @@ Verify installs
 
 
 
+Consolidated Deployment Guide:
+
+Prerequisites
+    bash
+        # macOS
+        brew install --cask docker
+        # Start Docker Desktop from Applications
+
+    # Verify
+        docker --version
+        docker compose version
+
+Step 1 — Project Setup
+    bash
+        cd /Users/<Path>/ai-tutor/ai-tutor
+        ls
+        # Expected: backend/  frontend/  docker-compose.yml  .env  infra/
+
+
+Step 2 — Configure .env
+
+
+Step 3 — Fix docker-compose.yml
+
+Step 4 — Build and Start
+        bash
+            docker compose build backend --no-cache
+            docker compose down
+            docker compose up -d
+            sleep 10
+            docker compose ps
+
+    All four should show Up:
+    text
+    ai-tutor-backend-1    Up
+    ai-tutor-frontend-1   Up
+    ai-tutor-postgres-1   Up (healthy)
+    ai-tutor-redis-1      Up (healthy)
+
+
+Step 5 — Migrations
+    bash
+        # Generate (only if versions/ is empty)
+        docker compose exec backend alembic revision --autogenerate -m "initial schema"
+        # Apply
+        docker compose exec backend alembic upgrade head
+        # Verify 14 tables
+        docker compose exec postgres psql -U tutor -d tutor -c "\dt"
+
+Step 6 — Verify
+    bash
+        # Health
+        curl http://localhost:8000/health
+        # → {"status":"ok","env":"development"}
+
+        # Check Ollama is reachable
+        docker compose exec backend curl -s http://host.docker.internal:11434/api/tags
+
+        # Ask
+        TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/register \
+          -H "Content-Type: application/json" \
+          -d '{"email":"t@t.com","password":"testpass123","full_name":"T"}' \
+          | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+        curl -X POST http://localhost:8000/api/v1/tutor/ask \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"question":"Explain what a variable is","mode":"teacher"}'
+
+        # Switch to OpenAI (if you ever want to)
+        # 1. Edit .env → LLM_PROVIDER=openai, LLM_API_KEY=sk-xxx
+        # 2. docker compose restart backend
+        # Open UI
+        open http://localhost:3000
+
+Daily Commands
+    bash
+        docker compose up -d              # start
+        docker compose down               # stop
+        docker compose logs -f backend    # logs
+        docker compose restart backend    # restart one
+        docker compose exec backend bash  # shell into backend
+        docker compose down -v            # wipe everything
+

@@ -1,17 +1,24 @@
 from typing import AsyncIterator
 from openai import AsyncOpenAI
-from anthropic import AsyncAnthropic
 from tenacity import retry, stop_after_attempt, wait_exponential
-import structlog
-
 from app.config import settings
 
-logger = structlog.get_logger()
-_openai = AsyncOpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY else None
-_anthropic = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY) if settings.ANTHROPIC_API_KEY else None
+_client = AsyncOpenAI(
+    base_url=settings.LLM_BASE_URL or "https://api.openai.com/v1",
+    api_key=settings.LLM_API_KEY or "ollama",
+    timeout=180.0,
+)
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
+def _is_ollama() -> bool:
+    return "11434" in (settings.LLM_BASE_URL or "")
+
+
+# ---------------------------------------------------------------
+# Legacy single-turn API
+# ---------------------------------------------------------------
+
+@retry(stop=stop_after_attempt(2), wait=wait_exponential(min=1, max=8))
 async def complete(
     prompt: str,
     system: str = "",
@@ -20,22 +27,44 @@ async def complete(
     max_tokens: int = 1500,
     json_mode: bool = False,
 ) -> str:
-    model = model or settings.LLM_MODEL_MEDIUM
-    if _openai is None:
-        raise RuntimeError("OPENAI_API_KEY not configured")
-
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
+    return await complete_chat(
+        messages, model=model, temperature=temperature,
+        max_tokens=max_tokens, json_mode=json_mode,
+    )
 
-    kwargs = dict(model=model, messages=messages, temperature=temperature, max_tokens=max_tokens)
-    if json_mode:
+
+# ---------------------------------------------------------------
+# Multi-turn chat API
+# ---------------------------------------------------------------
+
+@retry(stop=stop_after_attempt(2), wait=wait_exponential(min=1, max=8))
+async def complete_chat(
+    messages: list[dict],
+    model: str | None = None,
+    temperature: float = 0.3,
+    max_tokens: int = 1500,
+    json_mode: bool = False,
+) -> str:
+    kwargs = dict(
+        model=model or settings.LLM_MODEL_MEDIUM,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    if json_mode and not _is_ollama():
         kwargs["response_format"] = {"type": "json_object"}
 
-    resp = await _openai.chat.completions.create(**kwargs)
-    return resp.choices[0].message.content or ""
+    r = await _client.chat.completions.create(**kwargs)
+    return r.choices[0].message.content or ""
 
+
+# ---------------------------------------------------------------
+# Streaming
+# ---------------------------------------------------------------
 
 async def stream(
     prompt: str,
@@ -44,20 +73,33 @@ async def stream(
     temperature: float = 0.3,
     max_tokens: int = 1500,
 ) -> AsyncIterator[str]:
-    model = model or settings.LLM_MODEL_MEDIUM
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
+    async for tok in stream_chat(
+        messages, model=model, temperature=temperature, max_tokens=max_tokens,
+    ):
+        yield tok
 
-    stream_resp = await _openai.chat.completions.create(
-        model=model,
+
+async def stream_chat(
+    messages: list[dict],
+    model: str | None = None,
+    temperature: float = 0.3,
+    max_tokens: int = 1500,
+) -> AsyncIterator[str]:
+    stream_resp = await _client.chat.completions.create(
+        model=model or settings.LLM_MODEL_MEDIUM,
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
         stream=True,
     )
     async for chunk in stream_resp:
-        delta = chunk.choices[0].delta.content
-        if delta:
-            yield delta
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta
+        content = getattr(delta, "content", None)
+        if content:
+            yield content
