@@ -4,12 +4,15 @@ import { Send, Sparkles } from "lucide-react";
 import { useTutor } from "@/hooks/useTutor";
 import { MessageBubble } from "./MessageBubble";
 import { ModeSelector } from "./ModeSelector";
+import { DiagnosticBanner } from "./DiagnosticBanner";
+
 
 export function ChatWindow() {
   const { messages, ask, loading } = useTutor();
   const [input, setInput] = useState("");
   const [mode, setMode] = useState("teacher");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [diagnostic, setDiagnostic] = useState<any>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -31,7 +34,7 @@ export function ChatWindow() {
         </div>
         <ModeSelector value={mode} onChange={setMode} />
       </div>
-
+      <div> {diagnostic && <DiagnosticBanner diagnostic={diagnostic} />} </div>
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-gray-500 mt-20">

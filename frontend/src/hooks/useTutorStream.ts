@@ -24,6 +24,7 @@ export interface StreamHandlers {
   onVerification?: (v: Verification) => void;
   onDone?: () => void;
   onError?: (message: string) => void;
+  onDiagnostic?: (d: any) => void;
 }
 
 export function useTutorStream() {
@@ -102,6 +103,7 @@ export function useTutorStream() {
               case "verification": handlers.onVerification?.(data); break;
               case "done":         handlers.onDone?.(); break;
               case "error":        handlers.onError?.(data.message ?? "Unknown error"); break;
+              case "diagnostic": handlers.onDiagnostic?.(data); break;
             }
           }
         }

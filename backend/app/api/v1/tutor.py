@@ -182,6 +182,22 @@ async def ask_stream(
                 citations = _dedupe_citations(chunks)
                 yield sse("citations", {"citations": citations})
 
+                # Resolve concept + run diagnostic
+                from app.services.concept_graph import (
+                    resolve_concept_for_section,
+                    diagnose,
+                    build_diagnostic_block,
+                )
+                concept_key = await resolve_concept_for_section(db, payload.section_id)
+                if not concept_key and payload.section_id:
+                    concept_key = f"section:{payload.section_id}"
+
+                diag = await diagnose(db, student.id, concept_key) if concept_key else {}
+                diagnostic_block = build_diagnostic_block(diag) if diag else ""
+                mastery = diag.get("mastery", 0.0) if diag else 0.0
+
+                yield sse("diagnostic", diag)
+
                 verification = None
                 if qv.get("is_math") and payload.mode not in GUIDANCE_MODES:
                     verification = verify_answer(safety["text"], answer_text)

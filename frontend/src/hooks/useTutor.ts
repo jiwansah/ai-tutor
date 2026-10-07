@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useTutorStore } from "@/lib/store";
 import { useTutorStream, type Citation, type Verification } from "./useTutorStream";
+import { DiagnosticBanner } from "../components/tutor/DiagnosticBanner";
 
 export function useTutor() {
   const {
@@ -15,6 +16,7 @@ export function useTutor() {
   } = useTutorStore();
   const { stream, isStreaming } = useTutorStream();
   const [loading, setLoading] = useState(false);
+  const [diagnostic, setDiagnostic] = useState<any>(null);
 
   async function ask(question: string, opts: { mode?: string; section_id?: string } = {}) {
     if (!question.trim()) return;
@@ -37,6 +39,7 @@ export function useTutor() {
         onVerification: (v: Verification) => setVerificationOnLastTutor(v),
         onDone: () => setLoading(false),
         onError: () => setLoading(false),
+        onDiagnostic: (d) => setDiagnostic(d),
       },
     );
 

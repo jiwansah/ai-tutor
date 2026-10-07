@@ -6,6 +6,7 @@ Verify installs
     python3 --version   # 3.11.x or higher
     docker --version
     docker compose version
+    ollama list         # Output: llama3.2, gpt-oss:20b, and nomic-embed-text
 
 
 
@@ -16,6 +17,14 @@ Prerequisites
         # macOS
         brew install --cask docker
         # Start Docker Desktop from Applications
+
+        #Install Ollama the standalone LLM
+        curl -fsSL https://ollama.com | sh
+        ollama run llama3.2
+        ollama pull gpt-oss:20b
+        ollama pull nomic-embed-text
+        ollama list
+
 
     # Verify
         docker --version

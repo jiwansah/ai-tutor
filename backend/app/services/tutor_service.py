@@ -7,14 +7,16 @@ from app.services.knowledge_tracing import update_mastery
 from app.services.spaced_repetition import next_review
 from app.services.math_verifier import verify_question, verify_answer
 from app.services.conversation import load_history, build_messages
+from app.services.concept_graph import diagnose, resolve_concept_for_section, build_diagnostic_block
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 GUIDANCE_MODES = {"socratic", "hint", "practice"}
 
+
 def _build_verified_block(qv: dict, mode: str = "teacher") -> str:
     if mode in GUIDANCE_MODES:
-        return ""   # don't leak the answer in guidance modes
+        return ""
     if not qv.get("is_math"):
         return ""
     solutions = ", ".join(qv["solutions"])
@@ -68,16 +70,19 @@ class TutorService:
             section_id=section_id,
         )
 
-        # Load history BEFORE saving the new user message
         history = await load_history(self.db, session.id)
         await self.sessions.add_message(session.id, "user", safety["text"])
 
-        concept_key = f"section:{section_id}" if section_id else None
-        mastery = 0.0
-        if concept_key:
-            row = await self.students.get_mastery(student_id, concept_key)
-            if row:
-                mastery = row.mastery
+        # Resolve concept (either via section link or fallback to section key)
+        concept_key = await resolve_concept_for_section(self.db, section_id)
+        if not concept_key and section_id:
+            concept_key = f"section:{section_id}"
+
+        # Diagnostic
+        diag = await diagnose(self.db, student_id, concept_key) if concept_key else {}
+        diagnostic_block = build_diagnostic_block(diag) if diag else ""
+
+        mastery = diag.get("mastery", 0.0) if diag else 0.0
 
         chunks = await self.rag.retrieve(
             safety["text"], subject_id, chapter_id, section_id, top_k=5,
@@ -87,10 +92,13 @@ class TutorService:
         qv = verify_question(safety["text"])
         verified_block = _build_verified_block(qv, mode=mode)
 
+        # Prepend diagnostic to the context the LLM sees
+        augmented_context = diagnostic_block + context
+
         messages = build_messages(
             mode=mode,
             history=history,
-            context=context,
+            context=augmented_context,
             mastery=mastery,
             verified_block=verified_block,
             question=safety["text"],
@@ -99,7 +107,10 @@ class TutorService:
 
         answer = await complete_chat(messages, temperature=0.4, max_tokens=1500)
 
-        verification = verify_answer(safety["text"], answer) if qv.get("is_math") else None
+        verification = None
+        if qv.get("is_math") and mode not in GUIDANCE_MODES:
+            verification = verify_answer(safety["text"], answer)
+
         citations = _dedupe_citations(chunks)
 
         await self.sessions.add_message(
@@ -107,7 +118,12 @@ class TutorService:
             "tutor",
             answer,
             citations=citations,
-            meta={"mode": mode, "concept_key": concept_key, "verification": verification},
+            meta={
+                "mode": mode,
+                "concept_key": concept_key,
+                "verification": verification,
+                "diagnostic": diag,
+            },
         )
 
         return {
@@ -117,6 +133,7 @@ class TutorService:
             "mode": mode,
             "concept_key": concept_key,
             "verification": verification,
+            "diagnostic": diag,
         }
 
     async def submit_answer(self, *, student_id, session_id, question, student_answer, concept_key=None):

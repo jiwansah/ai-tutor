@@ -3,6 +3,7 @@ from app.db.models.curriculum import School, Class, Subject, Book, Chapter, Sect
 from app.db.models.content import ContentChunk
 from app.db.models.student import StudentProfile, ConceptMastery
 from app.db.models.session import TutorSession, Message, Attempt
+from app.db.models.concept import Concept, ConceptPrerequisite, ConceptMisconception
 
 __all__ = [
     "User", "UserRole",
@@ -10,4 +11,5 @@ __all__ = [
     "ContentChunk",
     "StudentProfile", "ConceptMastery",
     "TutorSession", "Message", "Attempt",
+    "Concept", "ConceptPrerequisite", "ConceptMisconception",
 ]
