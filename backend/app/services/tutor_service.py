@@ -6,6 +6,7 @@ from app.repositories.session_repo import SessionRepository
 from app.repositories.student_repo import StudentRepository
 from app.services.rag_service import RAGService
 from app.services.llm_service import complete_chat
+from app.services.assessment_generation import generate_assessment
 from app.services.safety_service import check_input
 from app.services.knowledge_tracing import update_mastery
 from app.services.spaced_repetition import next_review
@@ -14,6 +15,7 @@ from app.services.conversation import load_history, build_messages
 from app.services.concept_graph import diagnose, resolve_concept_for_section, build_diagnostic_block
 from app.services import analytics_service as A
 from app.services.intent import detect_intent
+from app.services.quiz_grader import extract_answer_key
 from app.db.models.curriculum import Class as ClassModel
 from sqlalchemy import select
 
@@ -125,7 +127,7 @@ class TutorService:
         augmented_context = diagnostic_block + context
 
         messages = build_messages(
-            mode=mode,
+            mode=effective_mode,
             history=history,
             context=augmented_context,
             mastery=mastery,
@@ -136,7 +138,12 @@ class TutorService:
             class_grade=grade,  # ← NEW
         )
 
-        answer = await complete_chat(messages, temperature=0.4, max_tokens=1500)
+        assessment_mode = effective_mode in ("quiz", "exam")
+        answer_key = {}
+        if assessment_mode:
+            answer, answer_key = await generate_assessment(messages, mode=effective_mode, max_tokens=1800)
+        else:
+            answer = await complete_chat(messages, temperature=0.4, max_tokens=1500)
 
         verification = None
         if qv.get("is_math") and mode not in GUIDANCE_MODES and mode not in ("practice", "quiz", "exam"):
@@ -150,12 +157,13 @@ class TutorService:
             answer,
             citations=citations,
             meta={
-                "mode": mode,
+                "mode": effective_mode,
                 "concept_key": concept_key,
                 "verification": verification,
                 "diagnostic": diag,
-                # The next user message should be treated as an answer
-                "awaiting_answers": mode in ("practice", "quiz", "exam"),
+                # Store the private key alongside the exact generated assessment.
+                "answer_key": {str(k): v for k, v in answer_key.items()},
+                "awaiting_answers": effective_mode in ("practice", "quiz", "exam"),
             },
         )
 
@@ -214,51 +222,6 @@ class TutorService:
             "awaiting_answers": mode in ("practice", "quiz", "exam"),  # NEW
         }
 
-    async def submit_answer(self, *, student_id, session_id, question, student_answer, concept_key=None,
-                            school_id=None, class_id=None):
-        is_correct = student_answer.strip().lower() in question.lower()
-        result = {
-            "is_correct": is_correct,
-            "correct_answer": "",
-            "method_valid": is_correct,
-            "confidence": 0.5,
-            "feedback": "Looks good." if is_correct else "Not quite — try again.",
-        }
-        new_mastery = 0.0
-        if concept_key:
-            prior = await self.students.get_mastery(student_id, concept_key)
-            p = prior.mastery if prior else 0.2
-            new_mastery = update_mastery(p, is_correct)
-            await self.students.upsert_mastery(student_id, concept_key, new_mastery, is_correct)
-
-        await self.sessions.log_attempt(
-            student_id=student_id,
-            concept_key=concept_key or "unknown",
-            question=question,
-            answer=student_answer,
-            is_correct=is_correct,
-            confidence=result["confidence"],
-            method_valid=result["method_valid"],
-            meta={"session_id": str(session_id)},
-        )
-
-        await A.log_event(
-            self.db,
-            event_type="student_submitted",
-            student_id=student_id,
-            school_id=school_id,
-            class_id=class_id,
-            concept_key=concept_key,
-            is_correct=is_correct,
-        )
-
-        return {
-            "evaluation": result,
-            "new_mastery": new_mastery,
-            "next_review": next_review(new_mastery).isoformat(),
-        }
-
-
     async def submit_answer(
         self,
         *,
@@ -275,12 +238,19 @@ class TutorService:
         # Load the tutor's previous message so the grader knows what was asked
         last_tutor = await self.sessions.get_last_tutor_message(session_id)
         tutor_text = last_tutor.content if last_tutor else ""
+        # The key is stored as message metadata and never sent to the student.
+        raw_key = (last_tutor.meta or {}).get("answer_key", {}) if last_tutor else {}
+        try:
+            answer_key = {int(k): str(v) for k, v in raw_key.items()}
+        except (AttributeError, TypeError, ValueError):
+            answer_key = {}
 
-        # Grade the answer (SymPy for math, LLM for everything else)
         result = await evaluate_answers(
             tutor_message=tutor_text,
             student_answer=student_answer,
             question=question,
+            answer_key=answer_key,
+            assessment_mode=bool(last_tutor and (last_tutor.meta or {}).get("mode") in ("quiz", "exam")),
         )
 
         is_correct = bool(result["is_correct"])

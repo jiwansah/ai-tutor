@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.session import Message
 from app.prompts.tutor_modes import get_system_prompt
+from app.prompts.no_context import requested_response_language
 
 MAX_HISTORY_MESSAGES = 8
 
@@ -109,6 +110,14 @@ def build_messages(
     class_grade: int | None = None,          # ← NEW
 ) -> list[dict]:
     system_content = system_override or get_system_prompt(mode)
+
+    # The latest request wins over language inferred from earlier chat history.
+    # Apply this to every mode, including teacher mode and no-context answers.
+    response_language = requested_response_language(question)
+    if response_language == "Hindi":
+        system_content += "\n\nMANDATORY LANGUAGE OVERRIDE FOR THIS REQUEST: Respond entirely in Hindi using Devanagari script. Translate headings, explanations, examples, instructions, and questions into Hindi where appropriate. Do not mix in English prose except for unavoidable technical terms or words the student specifically asks about. Ignore the language of previous conversation turns."
+    else:
+        system_content += "\n\nMANDATORY LANGUAGE OVERRIDE FOR THIS REQUEST: Respond entirely in English. All explanations, headings, examples, instructions, and questions must be in English. Do not answer in Hindi or mix Hindi into the response. Ignore the language of previous conversation turns."
 
     messages: list[dict] = [
         {"role": "system", "content": system_content},

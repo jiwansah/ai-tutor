@@ -1,6 +1,28 @@
 """
 No-textbook-context prompts, chosen by mode + class grade.
 """
+import re
+
+
+def requested_response_language(question: str) -> str:
+    """Infer the response language from the latest request, not old chat history."""
+    q = question or ""
+    # Explicit language instructions take priority over the script used to type them.
+    if re.search(r"\b(in hindi|answer in hindi|respond in hindi|hindi mein|हिंदी में|हिन्दी में)\b", q, re.IGNORECASE):
+        return "Hindi"
+    if re.search(r"\b(in english|answer in english|respond in english|english please)\b", q, re.IGNORECASE):
+        return "English"
+    # Hindi is normally written in Devanagari. Treat the current request as the
+    # source of truth so an older Hindi turn cannot pull an English answer off course.
+    if re.search(r"[\u0900-\u097F]", q):
+        return "Hindi"
+    return "English"
+
+
+def english_assessment_override(question: str) -> bool:
+    """Backward-compatible helper for tests/callers that check English requests."""
+    return requested_response_language(question) == "English"
+
 
 
 def _calibration(grade: int | None) -> str:
@@ -44,6 +66,10 @@ LANGUAGE: Respond ENTIRELY in the student's language.
 QUIZ_SYSTEM = """You are a patient school tutor in QUIZ mode.
 
 Generate exactly 3 multiple-choice questions. Nothing else.
+Every question MUST have exactly one unambiguously correct option and three clearly
+incorrect distractors. Never create a question where all options are wrong or where two
+options could both be correct. For English grammar, validate the grammar and tense in
+every option before choosing the answer key. Avoid ambiguous or context-dependent items.
 
 === FORMATTING RULES (follow exactly) ===
 - Leave ONE BLANK LINE between every question.
@@ -83,7 +109,15 @@ Reply with your answers when ready (e.g. 1 B, 2 B, 3 B).
 - Do NOT say "Correct!" or acknowledge any answer.
 - Nothing after the closing line.
 
-LANGUAGE: Full response in the student's language (Hindi → Devanagari).
+LANGUAGE: Follow the latest user request. If they ask for English or English grammar,
+write the entire quiz (question stems and all options) in English, even if earlier
+conversation turns used Hindi. Otherwise use the language of the latest request.
+
+INTERNAL GRADING KEY (required): After the visible quiz, append exactly one marker:
+[[ANSWER_KEY:1=A,2=C,3=B]]. The marker is for the backend only and must not appear
+in the student-visible response. Include one correct option letter for every question.
+Double-check that each keyed option is actually correct and that the letters match the
+question numbering. Do not omit this marker.
 """
 
 
@@ -228,12 +262,22 @@ D) <option>
 **Total Questions:** {total_q}  **Time:** {spec['mins']} minutes  **Maximum Marks:** {spec['marks']}
 
 === FORBIDDEN ===
-- Do NOT provide an answer key.
-- Do NOT solve any question.
+- Do NOT provide a student-visible answer key.
+- Do NOT solve any question in the visible paper.
 - Do NOT say "Correct!".
-- Nothing after "END OF PAPER" line.
+- The visible paper must end at "END OF PAPER".
 
-LANGUAGE: Full paper in the student's language (Hindi → Devanagari).
+INTERNAL GRADING KEY (required, not part of the visible paper): After the visible
+paper, append exactly one machine-readable marker. Include EVERY question number in the
+paper, not just the first three. Example for a 5-question paper:
+[[ANSWER_KEY:1=B,2=D,3=A,4=photosynthesis,5=chlorophyll]]. For each MCQ, use the
+correct option letter. For each short/long answer, use a concise canonical expected
+answer after the equals sign. Do not omit any question. The backend removes this marker
+before displaying the paper. Keep numbering stable and questions objectively gradable.
+
+LANGUAGE: Follow the latest user request. If the user asks for English or English
+grammar, write the entire paper, all questions, and all options in English, regardless
+of earlier conversation language. Otherwise use the language of the latest request.
 """
 
 def get_no_context_prompt(mode: str, grade: int | None = None) -> str:

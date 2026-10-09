@@ -17,7 +17,8 @@ from app.repositories.user_repo import UserRepository
 from app.repositories.session_repo import SessionRepository
 from app.services.tutor_service import TutorService, _build_verified_block, _dedupe_citations, GUIDANCE_MODES
 from app.services.rag_service import RAGService
-from app.services.llm_service import stream_chat
+from app.services.llm_service import stream_chat, complete_chat
+from app.services.assessment_generation import generate_assessment
 from app.services.safety_service import check_input
 from app.services.math_verifier import verify_question, verify_answer
 from app.services.conversation import load_history, build_messages
@@ -27,6 +28,7 @@ from app.services.concept_graph import (
 from app.services.enrollment import enforce_section_access
 from app.services import analytics_service as A
 from app.services.intent import detect_intent
+from app.services.quiz_grader import extract_answer_key
 from app.db.models.curriculum import Class as ClassModel
 from sqlalchemy import select
 
@@ -238,11 +240,17 @@ async def ask_stream(
                 )
 
                 full_answer: list[str] = []
-                async for token in stream_chat(messages, temperature=0.4, max_tokens=1500):
-                    full_answer.append(token)
-                    yield sse("token", {"text": token})
-
-                answer_text = "".join(full_answer)
+                assessment_mode = effective_mode in ("quiz", "exam")
+                answer_key = {}
+                if assessment_mode:
+                    # Keep assessment output buffered so the private key cannot leak.
+                    answer_text, answer_key = await generate_assessment(messages, mode=effective_mode, max_tokens=1800)
+                    yield sse("token", {"text": answer_text})
+                else:
+                    async for token in stream_chat(messages, temperature=0.4, max_tokens=1800):
+                        full_answer.append(token)
+                        yield sse("token", {"text": token})
+                    answer_text = "".join(full_answer)
 
                 citations = _dedupe_citations(chunks)
                 yield sse("citations", {"citations": citations})
@@ -261,10 +269,11 @@ async def ask_stream(
                     answer_text,
                     citations=citations,
                     meta={
-                        "mode": payload.mode,
+                        "mode": effective_mode,
                         "concept_key": concept_key,
                         "verification": verification,
                         "awaiting_answers": awaiting,
+                        "answer_key": {str(k): v for k, v in answer_key.items()} if assessment_mode else {},
                     },
                 )
 

@@ -11,7 +11,7 @@ import re
 
 from app.services.llm_service import complete
 from app.services.math_verifier import verify_question, verify_answer
-from app.services.quiz_grader import grade_quiz
+from app.services.quiz_grader import grade_quiz, grade_with_answer_key
 from app.prompts.evaluator import EVALUATOR_SYSTEM, EVALUATOR_USER
 from app.config import settings
 
@@ -41,8 +41,15 @@ async def evaluate_answers(
     tutor_message: str,
     student_answer: str,
     question: str,
+    answer_key: dict[int, str] | None = None,
+    assessment_mode: bool = False,
 ) -> dict:
     tutor_message = tutor_message or ""
+
+    # ---- Path 0: Key saved with this exact generated assessment ----
+    keyed = grade_with_answer_key(student_answer, answer_key or {})
+    if keyed is not None:
+        return keyed
 
     # ---- Path 1: Deterministic grader for MCQs (works for math AND any
     #              MCQ where the correct option can be inferred) ----
@@ -84,7 +91,22 @@ async def evaluate_answers(
             "source": "unsupported_math",
         }
 
-    # ---- Path 3: Non-math → LLM grader ----
+    # Quiz/exam grading must not guess when its generation-time key is missing.
+    if assessment_mode:
+        return {
+            "is_correct": False,
+            "per_question_correct": [],
+            "student_answers": [student_answer],
+            "correct_answers": [],
+            "score_percent": 0,
+            "feedback": (
+                "This assessment is missing its grading key, so I cannot score it reliably. "
+                "Please generate a new quiz or exam and try again."
+            ),
+            "source": "missing_answer_key",
+        }
+
+    # ---- Path 3: Non-math → LLM grader (best-effort only, not guaranteed exact) ----
     raw = await complete(
         prompt=EVALUATOR_USER.format(
             tutor_message=tutor_message[:4000],

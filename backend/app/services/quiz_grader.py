@@ -11,6 +11,7 @@ Student answers can be in two forms:
 No LLM. No hallucination. Fast. Deterministic.
 """
 import re
+import unicodedata
 import sympy as sp
 from typing import Any
 
@@ -165,23 +166,32 @@ def parse_student_answers(text: str) -> dict[int, str]:
 # Matching a student value to an option
 # ---------------------------------------------------------------
 
+def _normalise_answer(value: str) -> str:
+    """Normalize superficial formatting without treating partial substrings as equal."""
+    value = unicodedata.normalize("NFKC", value or "").casefold().strip()
+    value = value.replace("−", "-").replace("×", "*").replace("÷", "/")
+    value = re.sub(r"\s+", "", value)
+    value = value.strip(" .,:;")
+    return value
+
+
 def _value_matches_option(student_val: str, option_text: str) -> bool:
-    """
-    Does the student's value appear in the option?
-    'x=5' vs 'x = 5' → True
-    'y=3' vs 'y = 5' → False
-    """
-    s = student_val.replace(" ", "").lower()
-    o = option_text.replace(" ", "").lower()
-
-    # Direct substring match
-    if s in o or o in s:
+    """Exact normalized match only; never accept a shared digit/substring."""
+    s = _normalise_answer(student_val)
+    o = _normalise_answer(option_text)
+    if not s or not o:
+        return False
+    if s == o:
         return True
-
-    # Numeric comparison
-    s_nums = set(_NUM_RE.findall(s))
-    o_nums = set(_NUM_RE.findall(o))
-    return bool(s_nums & o_nums)
+    # Permit a student's bare value to match a clearly labeled equation option,
+    # but require the entire numeric expression/value to match.
+    try:
+        import sympy as _sympy
+        a = _sympy.sympify(s)
+        b = _sympy.sympify(o)
+        return bool(_sympy.simplify(a - b) == 0)
+    except Exception:
+        return False
 
 
 def _resolve_letter(student_ans: str, q: dict) -> str | None:
@@ -197,6 +207,64 @@ def _resolve_letter(student_ans: str, q: dict) -> str | None:
         if _value_matches_option(student_ans, opt_text):
             return letter
     return None
+
+
+# Internal answer key format: [[ANSWER_KEY:1=A,2=C,3=B]]
+_ANSWER_KEY_RE = re.compile(r"\[\[ANSWER_KEY\s*:\s*(.*?)\s*\]\]", re.IGNORECASE)
+
+
+def extract_answer_key(text: str) -> tuple[str, dict[int, str]]:
+    """Remove the internal key marker from display text and return parsed keys."""
+    match = _ANSWER_KEY_RE.search(text or "")
+    if not match:
+        return (text or "").strip(), {}
+    key: dict[int, str] = {}
+    for item in match.group(1).split(","):
+        parsed = re.fullmatch(r"\s*(\d+)\s*=\s*(.*?)\s*", item)
+        if parsed and parsed.group(2):
+            key[int(parsed.group(1))] = parsed.group(2).strip()
+    clean = ((text or "")[:match.start()] + (text or "")[match.end():]).strip()
+    return clean, key
+
+
+def grade_with_answer_key(student_answer: str, answer_key: dict[int, str]) -> dict[str, Any] | None:
+    """Grade against the key saved with the exact generated quiz/exam."""
+    if not answer_key:
+        return None
+    answers = parse_student_answers(student_answer)
+    # If there is one question and the learner gave a plain response, accept it as Q1.
+    if not answers and len(answer_key) == 1 and student_answer.strip():
+        answers = {next(iter(answer_key)): student_answer.strip()}
+    per_correct = []
+    student_values = []
+    correct_values = []
+    for num in sorted(answer_key):
+        expected = answer_key[num].strip()
+        supplied = answers.get(num, "")
+        # Keys A-D indicate MCQ: accept either its letter or the full keyed value
+        # only when the key was authored as a value rather than a letter.
+        if re.fullmatch(r"[A-Da-d]", expected):
+            normalized_expected = expected.upper()
+            normalized_supplied = supplied.strip().upper()
+            is_correct = normalized_supplied == normalized_expected
+        else:
+            is_correct = _normalise_answer(supplied) == _normalise_answer(expected)
+        student_values.append(supplied or "?")
+        correct_values.append(expected)
+        per_correct.append(is_correct)
+    total = len(per_correct)
+    count = sum(per_correct)
+    return {
+        "is_correct": count == total,
+        "per_question_correct": per_correct,
+        "student_answers": student_values,
+        "correct_answers": correct_values,
+        "score_percent": round(count * 100 / total) if total else 0,
+        "feedback": f"{count} out of {total} correct." + (
+            "" if count == total else " Check the questions marked incorrect."
+        ),
+        "source": "answer_key",
+    }
 
 
 # ---------------------------------------------------------------

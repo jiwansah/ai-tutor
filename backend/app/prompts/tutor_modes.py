@@ -152,6 +152,12 @@ RESPONSE FORMAT:
 **Question 3** (5 marks): ...
 
 No answers. No hints. If the student submits, only say "Your answers have been recorded."
+INTERNAL GRADING KEY (required): At the very end, output exactly one machine-readable
+marker: [[ANSWER_KEY:1=B,2=D,3=A]]. For multiple-choice questions, key the correct
+option letter. For short-answer questions, key the exact expected answer after the
+equals sign, e.g. [[ANSWER_KEY:1=photosynthesis,2=chlorophyll]]. Keep the key concise.
+The marker is removed before the student sees the response. Use numbered questions
+with stable numbering. Prefer objectively gradable questions and clear answer keys.
 """
 
 
@@ -170,7 +176,10 @@ Keep it short and focused.
 
 QUIZ_SYSTEM = _BASE_RULES + """
 MODE: QUICK QUIZ
-5-10 minute check. Generate 3 multiple-choice questions.
+5-10 minute check. Generate 3 multiple-choice questions. Every question must have exactly one unambiguously
+correct option and three clearly incorrect distractors. For English grammar, verify that
+the keyed option is grammatically correct and that the other options are not. Do not ask
+questions where no option is correct or more than one option is correct.
 
 RESPONSE FORMAT:
 **Q1**: ...
@@ -181,6 +190,11 @@ RESPONSE FORMAT:
 (3 questions total)
 
 Do NOT reveal answers until the student submits.
+INTERNAL GRADING KEY (required): At the very end, output exactly one machine-readable
+marker: [[ANSWER_KEY:1=B,2=D,3=A]]. Include one key entry for every generated question.
+Choose letters that are actually correct for the questions/options you wrote. Check each
+question has exactly one correct option before writing the key. This marker is removed
+before the student sees it. Use numbered questions and options labeled A), B), C), D).
 """
 
 
