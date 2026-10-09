@@ -133,8 +133,11 @@ async def ask_stream(
     user_class_id=None, inner_db=None):
 
     safety = await check_input(payload.question)
-    detected = detect_intent(safety["text"])
-    effective_mode = detected or payload.mode
+    if payload.mode == "teacher":
+        detected = detect_intent(safety["text"])
+        effective_mode = detected or "teacher"
+    else:
+        effective_mode = payload.mode
     grade = None
     if user_class_id:
         grade = (await inner_db.execute(
@@ -214,8 +217,8 @@ async def ask_stream(
 
                 qv = verify_question(safety["text"])
                 verified_block = _build_verified_block(qv, mode=payload.mode)
-
-                if qv.get("is_math") and payload.mode not in GUIDANCE_MODES:
+                NO_VERIFY_MODES = {"practice", "quiz", "exam"}
+                if qv.get("is_math") and effective_mode not in GUIDANCE_MODES and effective_mode not in NO_VERIFY_MODES:
                     yield sse("pre_verify", {
                         "equation": qv["equation"],
                         "variable": qv["variable"],
@@ -245,8 +248,9 @@ async def ask_stream(
                 yield sse("citations", {"citations": citations})
                 yield sse("mode", {"mode": effective_mode})
 
+                NO_VERIFY_MODES = {"practice", "quiz", "exam"}
                 verification = None
-                if qv.get("is_math") and payload.mode not in GUIDANCE_MODES:
+                if qv.get("is_math") and effective_mode not in GUIDANCE_MODES and effective_mode not in NO_VERIFY_MODES:
                     verification = verify_answer(safety["text"], answer_text)
                     yield sse("verification", verification)
 
@@ -306,7 +310,8 @@ async def ask_stream(
                 # ---- /ANALYTICS ----
 
                 await inner_db.commit()
-                yield sse("done", {"awaiting_answers": awaiting})
+                awaiting = effective_mode in ("practice", "quiz", "exam")
+                yield sse("done", {"awaiting_answers": awaiting, "effective_mode": effective_mode})
 
         except Exception as e:
             yield sse("error", {"message": str(e)})

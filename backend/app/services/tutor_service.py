@@ -70,8 +70,11 @@ class TutorService:
 
         safety = await check_input(question)
         # Auto-switch mode if the student asked for questions in a non-quiz mode
-        detected = detect_intent(safety["text"])
-        effective_mode = detected or mode
+        if mode == "teacher":
+            detected = detect_intent(safety["text"])
+            effective_mode = detected or "teacher"
+        else:
+            effective_mode = mode
         grade = None
         if class_id:
             grade = (await self.db.execute(
@@ -136,7 +139,7 @@ class TutorService:
         answer = await complete_chat(messages, temperature=0.4, max_tokens=1500)
 
         verification = None
-        if qv.get("is_math") and mode not in GUIDANCE_MODES:
+        if qv.get("is_math") and mode not in GUIDANCE_MODES and mode not in ("practice", "quiz", "exam"):
             verification = verify_answer(safety["text"], answer)
 
         citations = _dedupe_citations(chunks)

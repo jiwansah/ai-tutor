@@ -127,10 +127,13 @@ def extract_equation(text: str) -> tuple[str, str, str] | None:
 # ---------------------------------------------------------------
 
 def _to_sympy(expr_str: str, var_symbol: sp.Symbol) -> sp.Expr:
-    s = expr_str.replace("^", "**")
-    s = re.sub(r"(\d)([a-zA-Z])", r"\1*\2", s)      # 2x -> 2*x
-    s = re.sub(r"([a-zA-Z])\(", r"\1*(", s)          # x(  -> x*(
-    s = re.sub(r"\)([a-zA-Z0-9])", r")*\1", s)       # )x -> )*x
+    s = expr_str.strip()
+    # Strip punctuation that LLMs add mid-expression (commas, periods, etc.)
+    s = re.sub(r"[,;:?!]+", "", s)
+    s = s.replace("^", "**")
+    s = re.sub(r"(\d)([a-zA-Z])", r"\1*\2", s)
+    s = re.sub(r"([a-zA-Z])\(", r"\1*(", s)
+    s = re.sub(r"\)([a-zA-Z0-9])", r")*\1", s)
     return sp.sympify(s, locals={str(var_symbol): var_symbol})
 
 

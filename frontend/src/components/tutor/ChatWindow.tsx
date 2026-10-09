@@ -7,7 +7,7 @@ import { ModeSelector } from "./ModeSelector";
 import { ChapterPicker, type StudyScope } from "./ChapterPicker";
 
 export function ChatWindow() {
-  const { messages, ask, loading } = useTutor();
+  const { messages, ask, loading, awaitingAnswers } = useTutor();
   const [input, setInput] = useState("");
   const [mode, setMode] = useState("teacher");
   const [scope, setScope] = useState<StudyScope>({ subjectId: null, chapterId: null });
@@ -42,7 +42,14 @@ export function ChatWindow() {
         </div>
       </div>
 
-      {/* Messages — only scrollable region */}
+      {/* Awaiting-answers banner */}
+      {awaitingAnswers && (
+        <div className="flex-shrink-0 bg-blue-50 border-b border-blue-200 px-3 sm:px-6 py-2 text-xs text-blue-900">
+          📝 Answer the questions above — I'll grade them and show your score.
+        </div>
+      )}
+
+      {/* Messages */}
       <div
         ref={scrollRef}
         className="chat-scroll flex-1 min-h-0 px-3 sm:px-6 py-4"
@@ -71,7 +78,7 @@ export function ChatWindow() {
         </div>
       </div>
 
-      {/* Input — pinned to bottom */}
+      {/* Input */}
       <div className="flex-shrink-0 border-t bg-white px-3 sm:px-6 py-3">
         <div className="flex gap-2 items-end max-w-4xl mx-auto">
           <textarea
@@ -83,7 +90,9 @@ export function ChatWindow() {
                 handleSend();
               }
             }}
-            placeholder="Ask a question…"
+            placeholder={awaitingAnswers
+              ? "Type your answers (e.g. 1 B, 2 A, 3 C)…"
+              : "Ask a question…"}
             rows={1}
             disabled={loading}
             className="flex-1 resize-none rounded-2xl border border-gray-300 px-4 py-2.5 text-base leading-6 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 max-h-32"
