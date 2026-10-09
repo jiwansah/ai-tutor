@@ -1,4 +1,5 @@
 import json
+import time
 from typing import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import decode_token
 from app.db.models.user import User
 from app.db.session import get_db, AsyncSessionLocal
+from app.prompts.no_context import get_no_context_prompt
 from app.repositories.student_repo import StudentRepository
 from app.repositories.user_repo import UserRepository
 from app.repositories.session_repo import SessionRepository
@@ -19,6 +21,14 @@ from app.services.llm_service import stream_chat
 from app.services.safety_service import check_input
 from app.services.math_verifier import verify_question, verify_answer
 from app.services.conversation import load_history, build_messages
+from app.services.concept_graph import (
+    resolve_concept_for_section, diagnose, build_diagnostic_block,
+)
+from app.services.enrollment import enforce_section_access
+from app.services import analytics_service as A
+from app.services.intent import detect_intent
+from app.db.models.curriculum import Class as ClassModel
+from sqlalchemy import select
 
 router = APIRouter()
 bearer = HTTPBearer(auto_error=True)
@@ -69,12 +79,22 @@ async def ask(
     student = await StudentRepository(db).get_profile_by_user(user.id)
     if not student:
         raise HTTPException(400, "Student profile missing")
+
+    # Enrollment check
+    await enforce_section_access(db, user, payload.section_id)
+
     svc = TutorService(db)
     try:
         result = await svc.ask(
-            student_id=student.id, mode=payload.mode, question=payload.question,
-            subject_id=payload.subject_id, chapter_id=payload.chapter_id,
-            section_id=payload.section_id, session_id=payload.session_id,
+            student_id=student.id,
+            mode=payload.mode,
+            question=payload.question,
+            subject_id=payload.subject_id,
+            chapter_id=payload.chapter_id,
+            section_id=payload.section_id,
+            session_id=payload.session_id,
+            school_id=user.school_id,       # <-- pass through
+            class_id=user.class_id,         # <-- pass through
         )
         await db.commit()
         return result
@@ -93,9 +113,13 @@ async def submit_answer(
         raise HTTPException(400, "Student profile missing")
     svc = TutorService(db)
     result = await svc.submit_answer(
-        student_id=student.id, session_id=payload.session_id,
-        question=payload.question, student_answer=payload.student_answer,
+        student_id=student.id,
+        session_id=payload.session_id,
+        question=payload.question,
+        student_answer=payload.student_answer,
         concept_key=payload.concept_key,
+        school_id=user.school_id,
+        class_id=user.class_id,
     )
     await db.commit()
     return result
@@ -105,20 +129,39 @@ async def submit_answer(
 async def ask_stream(
     payload: AskRequest,
     user: User = Depends(current_user),
-):
+    db: AsyncSession = Depends(get_db),
+    user_class_id=None, inner_db=None):
+
     safety = await check_input(payload.question)
+    detected = detect_intent(safety["text"])
+    effective_mode = detected or payload.mode
+    grade = None
+    if user_class_id:
+        grade = (await inner_db.execute(
+            select(ClassModel.grade).where(ClassModel.id == user_class_id)
+        )).scalar_one_or_none()
+
     if not safety["ok"]:
         raise HTTPException(400, f"Input blocked: {safety.get('reason')}")
 
+    # Enrollment check before opening the stream
+    await enforce_section_access(db, user, payload.section_id)
+
+    # Capture user enrollment now (session may close inside the generator)
+    user_school_id = user.school_id
+    user_class_id = user.class_id
+    user_id = user.id
+
     async def event_generator() -> AsyncIterator[str]:
+        t0 = time.perf_counter()
         try:
-            async with AsyncSessionLocal() as db:
-                student = await StudentRepository(db).get_profile_by_user(user.id)
+            async with AsyncSessionLocal() as inner_db:
+                student = await StudentRepository(inner_db).get_profile_by_user(user_id)
                 if not student:
                     yield sse("error", {"message": "Student profile missing"})
                     return
 
-                sessions = SessionRepository(db)
+                sessions = SessionRepository(inner_db)
                 session = await sessions.get_or_create(
                     session_id=payload.session_id,
                     student_id=student.id,
@@ -128,34 +171,51 @@ async def ask_stream(
                     section_id=payload.section_id,
                 )
 
-                # Load history BEFORE persisting the new user message
-                history = await load_history(db, session.id)
+                history = await load_history(inner_db, session.id)
                 await sessions.add_message(session.id, "user", safety["text"])
-                await db.commit()
+                await inner_db.commit()
 
                 yield sse("session", {"session_id": str(session.id)})
 
-                concept_key = f"section:{payload.section_id}" if payload.section_id else None
-                mastery = 0.0
-                if concept_key:
-                    row = await StudentRepository(db).get_mastery(student.id, concept_key)
-                    if row:
-                        mastery = row.mastery
+                # Only run diagnostic when the student is explicitly inside a section.
+                # Prevents Math prerequisites leaking into Hindi/English/Science questions.
+                concept_key = None
+                diag = {}
 
-                rag = RAGService(db)
+                if payload.section_id:
+                    concept_key = await resolve_concept_for_section(inner_db, payload.section_id)
+                    if concept_key:
+                        diag = await diagnose(inner_db, student.id, concept_key)
+
+                diagnostic_block = build_diagnostic_block(diag) if diag else ""
+                mastery = diag.get("mastery", 0.0) if diag else 0.0
+
+                yield sse("diagnostic", diag)
+
+                rag = RAGService(inner_db)
                 chunks = await rag.retrieve(
                     safety["text"],
                     subject_id=payload.subject_id,
                     chapter_id=payload.chapter_id,
                     section_id=payload.section_id,
+                    class_id=user_class_id,
                     top_k=5,
                 )
                 context = RAGService.format_context(chunks)
 
+                has_context = len(chunks) > 0
+                system_override = None if has_context else get_no_context_prompt(effective_mode, grade)
+
+                # Still emit the SSE event so the frontend can show its banner
+                if not has_context:
+                    yield sse("no_context", {
+                        "message": "Answering from general knowledge — this topic isn't in your textbook yet."
+                    })
+
                 qv = verify_question(safety["text"])
                 verified_block = _build_verified_block(qv, mode=payload.mode)
 
-                if qv.get("is_math"):
+                if qv.get("is_math") and payload.mode not in GUIDANCE_MODES:
                     yield sse("pre_verify", {
                         "equation": qv["equation"],
                         "variable": qv["variable"],
@@ -163,13 +223,15 @@ async def ask_stream(
                     })
 
                 messages = build_messages(
-                    mode=payload.mode,
+                    mode=effective_mode,
                     history=history,
-                    context=context,
+                    context=diagnostic_block + context,
                     mastery=mastery,
                     verified_block=verified_block,
                     question=safety["text"],
                     qv=qv,
+                    system_override=system_override,
+                    class_grade=grade,  # ← NEW
                 )
 
                 full_answer: list[str] = []
@@ -181,28 +243,14 @@ async def ask_stream(
 
                 citations = _dedupe_citations(chunks)
                 yield sse("citations", {"citations": citations})
-
-                # Resolve concept + run diagnostic
-                from app.services.concept_graph import (
-                    resolve_concept_for_section,
-                    diagnose,
-                    build_diagnostic_block,
-                )
-                concept_key = await resolve_concept_for_section(db, payload.section_id)
-                if not concept_key and payload.section_id:
-                    concept_key = f"section:{payload.section_id}"
-
-                diag = await diagnose(db, student.id, concept_key) if concept_key else {}
-                diagnostic_block = build_diagnostic_block(diag) if diag else ""
-                mastery = diag.get("mastery", 0.0) if diag else 0.0
-
-                yield sse("diagnostic", diag)
+                yield sse("mode", {"mode": effective_mode})
 
                 verification = None
                 if qv.get("is_math") and payload.mode not in GUIDANCE_MODES:
                     verification = verify_answer(safety["text"], answer_text)
                     yield sse("verification", verification)
 
+                awaiting = payload.mode in ("practice", "quiz", "exam")
                 await sessions.add_message(
                     session.id,
                     "tutor",
@@ -212,11 +260,53 @@ async def ask_stream(
                         "mode": payload.mode,
                         "concept_key": concept_key,
                         "verification": verification,
+                        "awaiting_answers": awaiting,
                     },
                 )
-                await db.commit()
 
-                yield sse("done", {})
+                # ---- ANALYTICS ----
+                duration_ms = int((time.perf_counter() - t0) * 1000)
+
+                await A.log_event(
+                    inner_db,
+                    event_type="question_asked",
+                    student_id=student.id,
+                    school_id=user_school_id,
+                    class_id=user_class_id,
+                    section_id=payload.section_id,
+                    concept_key=concept_key,
+                    mode=payload.mode,
+                    duration_ms=duration_ms,
+                )
+
+                if verification and verification.get("verified") is not None:
+                    await A.log_event(
+                        inner_db,
+                        event_type="answer_evaluated",
+                        student_id=student.id,
+                        school_id=user_school_id,
+                        class_id=user_class_id,
+                        concept_key=concept_key,
+                        mode=payload.mode,
+                        is_correct=verification["verified"],
+                        was_verified=verification["verified"],
+                    )
+
+                if diag.get("recommendation") == "review_prerequisite":
+                    await A.log_event(
+                        inner_db,
+                        event_type="prerequisite_flagged",
+                        student_id=student.id,
+                        school_id=user_school_id,
+                        class_id=user_class_id,
+                        concept_key=concept_key,
+                        mode=payload.mode,
+                        extra={"prerequisite": diag.get("recommended_prerequisite")},
+                    )
+                # ---- /ANALYTICS ----
+
+                await inner_db.commit()
+                yield sse("done", {"awaiting_answers": awaiting})
 
         except Exception as e:
             yield sse("error", {"message": str(e)})

@@ -75,6 +75,8 @@ class ConceptIn(BaseModel):
     key: str = Field(min_length=2, max_length=120)
     name: str
     description: str | None = None
+    class_id: str | None = None        # NEW
+    subject_id: str | None = None      # NEW
     primary_section_id: str | None = None
     learning_objectives: list[str] = []
     order_index: int = 0
@@ -83,6 +85,8 @@ class ConceptIn(BaseModel):
 class ConceptUpdateIn(BaseModel):
     name: str | None = None
     description: str | None = None
+    class_id: str | None = None
+    subject_id: str | None = None
     primary_section_id: str | None = None
     learning_objectives: list[str] | None = None
     order_index: int | None = None
@@ -284,27 +288,47 @@ async def delete_section_chunks(section_id: str, _: User = Depends(require_teach
 # ---------------------------------------------------------------
 
 @router.get("/concepts")
-async def teacher_list_concepts(_: User = Depends(require_teacher), db: AsyncSession = Depends(get_db)):
-    rows = (await db.execute(select(Concept).order_by(Concept.order_index, Concept.name))).scalars().all()
+async def teacher_list_concepts(
+    class_id: str | None = None,
+    subject_id: str | None = None,
+    include_global: bool = True,
+    _: User = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.repositories.concept_repo import ConceptRepository
+    concepts = await ConceptRepository(db).list_for_scope(class_id, subject_id, include_global)
     return [
         {
-            "key": c.key, "name": c.name, "description": c.description,
+            "key": c.key,
+            "name": c.name,
+            "description": c.description,
+            "class_id": str(c.class_id) if c.class_id else None,
+            "subject_id": str(c.subject_id) if c.subject_id else None,
             "primary_section_id": str(c.primary_section_id) if c.primary_section_id else None,
+            "is_global": c.class_id is None and c.subject_id is None,
             "learning_objectives": c.learning_objectives or [],
             "order_index": c.order_index,
         }
-        for c in rows
+        for c in concepts
     ]
 
 
 @router.post("/concepts", status_code=201)
-async def create_concept(payload: ConceptIn, _: User = Depends(require_teacher), db: AsyncSession = Depends(get_db)):
+async def create_concept(
+    payload: ConceptIn,
+    _: User = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
     existing = (await db.execute(select(Concept).where(Concept.key == payload.key))).scalar_one_or_none()
     if existing:
         raise HTTPException(409, "Concept key already exists")
     c = Concept(
-        key=payload.key, name=payload.name, description=payload.description,
-        primary_section_id=payload.primary_section_id,
+        key=payload.key,
+        name=payload.name,
+        description=payload.description,
+        class_id=payload.class_id or None,
+        subject_id=payload.subject_id or None,
+        primary_section_id=payload.primary_section_id or None,
         learning_objectives=payload.learning_objectives,
         order_index=payload.order_index,
     )
@@ -314,7 +338,12 @@ async def create_concept(payload: ConceptIn, _: User = Depends(require_teacher),
 
 
 @router.patch("/concepts/{key}")
-async def update_concept(key: str, payload: ConceptUpdateIn, _: User = Depends(require_teacher), db: AsyncSession = Depends(get_db)):
+async def update_concept(
+    key: str,
+    payload: ConceptUpdateIn,
+    _: User = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
     c = (await db.execute(select(Concept).where(Concept.key == key))).scalar_one_or_none()
     if not c:
         raise HTTPException(404, "Concept not found")
@@ -322,6 +351,10 @@ async def update_concept(key: str, payload: ConceptUpdateIn, _: User = Depends(r
         c.name = payload.name
     if payload.description is not None:
         c.description = payload.description
+    if payload.class_id is not None:
+        c.class_id = payload.class_id or None
+    if payload.subject_id is not None:
+        c.subject_id = payload.subject_id or None
     if payload.primary_section_id is not None:
         c.primary_section_id = payload.primary_section_id or None
     if payload.learning_objectives is not None:

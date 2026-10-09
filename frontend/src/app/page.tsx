@@ -1,6 +1,23 @@
+"use client";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/lib/store";
 
 export default function Home() {
+  const router = useRouter();
+  const { user, token } = useAuth();
+
+  useEffect(() => {
+    if (!token || !user) return;
+    if (user.role === "teacher" || user.role === "admin") {
+      router.replace("/teacher");
+    } else if (user.role === "student") {
+      router.replace("/tutor");
+    }
+    // parent/admin handled later
+  }, [token, user, router]);
+
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-8">
       <h1 className="text-4xl font-bold text-indigo-600 mb-4">AI Tutor</h1>

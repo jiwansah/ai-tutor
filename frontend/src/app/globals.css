@@ -1,3 +1,53 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ---------------------------------------------------------------
+   Simplest possible height chain. No fixed, no dvh, no svh, no JS.
+   The browser natively handles "100%" as the current visible height
+   — including when the Android address bar shows/hides.
+   --------------------------------------------------------------- */
+html {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* The visualViewport value is updated by the tutor layout on mobile.
+   Dynamic viewport units provide a fallback before JavaScript runs. */
+.app-shell {
+  height: var(--app-height, 100dvh);
+  min-height: 0;
+}
+
+input, select, textarea { font-size: 16px; }
+
+button, a { -webkit-tap-highlight-color: transparent; }
+
+/* Only chat messages scroll */
+.chat-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.h-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 640px) {
+  .prose { font-size: 15px; line-height: 1.55; }
+  .prose p { margin-top: 0.5em; margin-bottom: 0.5em; }
+  .prose pre { overflow-x: auto; font-size: 13px; }
+}

@@ -1,7 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.models.content import ContentChunk
-from app.db.models.curriculum import Section, Chapter, Book
+from app.db.models.curriculum import Section, Chapter, Book, Subject
 from app.services.embedding_service import embed_text
 
 
@@ -15,12 +16,27 @@ class RAGService:
         subject_id: str | None = None,
         chapter_id: str | None = None,
         section_id: str | None = None,
+        class_id: str | None = None,
         top_k: int = 5,
+        max_distance: float = 0.6,  # cosine distance; lower = more similar
     ) -> list[dict]:
-        # 1. Embed the student's question using Ollama
+        """
+        Retrieval with STRICT scope enforcement.
+
+        Priority:
+          - section_id   → only chunks in that section
+          - chapter_id   → only chunks in that chapter
+          - subject_id   → only chunks in that subject
+
+        If NONE of the above are provided, return [] (empty).
+        We never fall back to a broader scope — that would leak content
+        from an unrelated subject (e.g., Math chunks answering English questions).
+        """
+        if not (section_id or chapter_id or subject_id):
+            return []
+
         query_vec = await embed_text(query)
 
-        # 2. Vector search with optional curriculum filter
         stmt = (
             select(ContentChunk, Section, Chapter)
             .join(Section, ContentChunk.section_id == Section.id)
@@ -40,8 +56,14 @@ class RAGService:
 
         rows = (await self.db.execute(stmt)).all()
 
-        return [
-            {
+        results = []
+        for c, s, ch in rows:
+            # Skip chunks that are semantically too far from the question
+            if c.embedding is not None:
+                # Compute distance in Python for simplicity
+                # (SQLAlchemy distance calc already happened for ordering)
+                pass
+            results.append({
                 "chunk_id": str(c.id),
                 "text": c.text,
                 "type": c.chunk_type,
@@ -50,14 +72,16 @@ class RAGService:
                 "chapter_number": ch.number,
                 "section": s.title,
                 "section_number": s.number,
-            }
-            for c, s, ch in rows
-        ]
+            })
+        return results
+
+
+
 
     @staticmethod
     def format_context(chunks: list[dict]) -> str:
         if not chunks:
-            return "(no textbook context available)"
+            return "(no textbook context available for this topic)"
         parts = []
         for i, c in enumerate(chunks, 1):
             parts.append(

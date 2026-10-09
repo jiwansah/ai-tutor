@@ -1,3 +1,7 @@
+import time
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.prompts.no_context import get_no_context_prompt
 from app.repositories.session_repo import SessionRepository
 from app.repositories.student_repo import StudentRepository
 from app.services.rag_service import RAGService
@@ -8,7 +12,10 @@ from app.services.spaced_repetition import next_review
 from app.services.math_verifier import verify_question, verify_answer
 from app.services.conversation import load_history, build_messages
 from app.services.concept_graph import diagnose, resolve_concept_for_section, build_diagnostic_block
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.services import analytics_service as A
+from app.services.intent import detect_intent
+from app.db.models.curriculum import Class as ClassModel
+from sqlalchemy import select
 
 
 GUIDANCE_MODES = {"socratic", "hint", "practice"}
@@ -56,8 +63,21 @@ class TutorService:
         chapter_id=None,
         section_id=None,
         session_id=None,
+        school_id=None,
+        class_id=None,
     ):
+        t0 = time.perf_counter()
+
         safety = await check_input(question)
+        # Auto-switch mode if the student asked for questions in a non-quiz mode
+        detected = detect_intent(safety["text"])
+        effective_mode = detected or mode
+        grade = None
+        if class_id:
+            grade = (await self.db.execute(
+                select(ClassModel.grade).where(ClassModel.id == class_id)
+            )).scalar_one_or_none()
+
         if not safety["ok"]:
             raise ValueError(f"Input blocked: {safety.get('reason')}")
 
@@ -73,26 +93,32 @@ class TutorService:
         history = await load_history(self.db, session.id)
         await self.sessions.add_message(session.id, "user", safety["text"])
 
-        # Resolve concept (either via section link or fallback to section key)
-        concept_key = await resolve_concept_for_section(self.db, section_id)
-        if not concept_key and section_id:
-            concept_key = f"section:{section_id}"
+        concept_key = None
+        diag = {}
+        if section_id:
+            concept_key = await resolve_concept_for_section(self.db, section_id)
+            if concept_key:
+                diag = await diagnose(self.db, student_id, concept_key)
 
-        # Diagnostic
-        diag = await diagnose(self.db, student_id, concept_key) if concept_key else {}
         diagnostic_block = build_diagnostic_block(diag) if diag else ""
-
         mastery = diag.get("mastery", 0.0) if diag else 0.0
 
         chunks = await self.rag.retrieve(
-            safety["text"], subject_id, chapter_id, section_id, top_k=5,
+            safety["text"],
+            subject_id=subject_id,
+            chapter_id=chapter_id,
+            section_id=section_id,
+            class_id=class_id,
+            top_k=5,
         )
         context = RAGService.format_context(chunks)
-
+        no_context = len(chunks) == 0
+        # Decide whether to use the standard mode prompt or the no-context prompt
+        has_context = len(chunks) > 0
+        system_override = None if has_context else get_no_context_prompt(effective_mode, grade)
         qv = verify_question(safety["text"])
         verified_block = _build_verified_block(qv, mode=mode)
 
-        # Prepend diagnostic to the context the LLM sees
         augmented_context = diagnostic_block + context
 
         messages = build_messages(
@@ -103,6 +129,8 @@ class TutorService:
             verified_block=verified_block,
             question=safety["text"],
             qv=qv,
+            system_override=system_override,
+            class_grade=grade,  # ← NEW
         )
 
         answer = await complete_chat(messages, temperature=0.4, max_tokens=1500)
@@ -123,8 +151,53 @@ class TutorService:
                 "concept_key": concept_key,
                 "verification": verification,
                 "diagnostic": diag,
+                # The next user message should be treated as an answer
+                "awaiting_answers": mode in ("practice", "quiz", "exam"),
             },
         )
+
+        # ---- ANALYTICS ----
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+
+        await A.log_event(
+            self.db,
+            event_type="question_asked",
+            student_id=student_id,
+            school_id=school_id,
+            class_id=class_id,
+            subject_id=subject_id,
+            chapter_id=chapter_id,
+            section_id=section_id,
+            concept_key=concept_key,
+            mode=mode,
+            duration_ms=duration_ms,
+        )
+
+        if verification and verification.get("verified") is not None:
+            await A.log_event(
+                self.db,
+                event_type="answer_evaluated",
+                student_id=student_id,
+                school_id=school_id,
+                class_id=class_id,
+                concept_key=concept_key,
+                mode=mode,
+                is_correct=verification["verified"],
+                was_verified=verification["verified"],
+            )
+
+        if diag.get("recommendation") == "review_prerequisite":
+            await A.log_event(
+                self.db,
+                event_type="prerequisite_flagged",
+                student_id=student_id,
+                school_id=school_id,
+                class_id=class_id,
+                concept_key=concept_key,
+                mode=mode,
+                extra={"prerequisite": diag.get("recommended_prerequisite")},
+            )
+        # ---- /ANALYTICS ----
 
         return {
             "session_id": str(session.id),
@@ -134,9 +207,12 @@ class TutorService:
             "concept_key": concept_key,
             "verification": verification,
             "diagnostic": diag,
+            "no_context": not has_context,
+            "awaiting_answers": mode in ("practice", "quiz", "exam"),  # NEW
         }
 
-    async def submit_answer(self, *, student_id, session_id, question, student_answer, concept_key=None):
+    async def submit_answer(self, *, student_id, session_id, question, student_answer, concept_key=None,
+                            school_id=None, class_id=None):
         is_correct = student_answer.strip().lower() in question.lower()
         result = {
             "is_correct": is_correct,
@@ -162,8 +238,94 @@ class TutorService:
             method_valid=result["method_valid"],
             meta={"session_id": str(session_id)},
         )
+
+        await A.log_event(
+            self.db,
+            event_type="student_submitted",
+            student_id=student_id,
+            school_id=school_id,
+            class_id=class_id,
+            concept_key=concept_key,
+            is_correct=is_correct,
+        )
+
         return {
             "evaluation": result,
+            "new_mastery": new_mastery,
+            "next_review": next_review(new_mastery).isoformat(),
+        }
+
+
+    async def submit_answer(
+        self,
+        *,
+        student_id,
+        session_id,
+        question,
+        student_answer,
+        concept_key=None,
+        school_id=None,
+        class_id=None,
+    ):
+        from app.services.evaluator_service import evaluate_answers
+
+        # Load the tutor's previous message so the grader knows what was asked
+        last_tutor = await self.sessions.get_last_tutor_message(session_id)
+        tutor_text = last_tutor.content if last_tutor else ""
+
+        # Grade the answer (SymPy for math, LLM for everything else)
+        result = await evaluate_answers(
+            tutor_message=tutor_text,
+            student_answer=student_answer,
+            question=question,
+        )
+
+        is_correct = bool(result["is_correct"])
+
+        # Update mastery via knowledge tracing
+        new_mastery = 0.0
+        if concept_key:
+            prior = await self.students.get_mastery(student_id, concept_key)
+            p = prior.mastery if prior else 0.2
+            new_mastery = update_mastery(p, is_correct)
+            await self.students.upsert_mastery(student_id, concept_key, new_mastery, is_correct)
+
+        # Log the attempt
+        await self.sessions.log_attempt(
+            student_id=student_id,
+            concept_key=concept_key or "unknown",
+            question=question,
+            answer=student_answer,
+            is_correct=is_correct,
+            confidence=result.get("score_percent", 0) / 100.0,
+            method_valid=is_correct,
+            meta={
+                "session_id": str(session_id),
+                "per_question_correct": result.get("per_question_correct", []),
+                "correct_answers": result.get("correct_answers", []),
+                "grader": result.get("source", "llm"),
+            },
+        )
+
+        # Analytics
+        await A.log_event(
+            self.db,
+            event_type="student_submitted",
+            student_id=student_id,
+            school_id=school_id,
+            class_id=class_id,
+            concept_key=concept_key,
+            is_correct=is_correct,
+        )
+
+        return {
+            "is_correct": is_correct,
+            "score_percent": result.get("score_percent", 0),
+            "per_question_correct": result.get("per_question_correct", []),
+            "student_answers": result.get("student_answers", []),
+            "correct_answers": result.get("correct_answers", []),
+            "feedback": result.get("feedback", ""),
+            "grader": result.get("source", "llm"),
             "new_mastery": new_mastery,
             "next_review": next_review(new_mastery).isoformat(),
         }

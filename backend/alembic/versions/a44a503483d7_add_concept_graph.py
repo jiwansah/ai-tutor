@@ -10,7 +10,7 @@ import pgvector.sqlalchemy
 
 
 revision = 'a44a503483d7'
-down_revision = '699052cc7599'
+down_revision = 'ff03280a4e54'
 branch_labels = None
 depends_on = None
 

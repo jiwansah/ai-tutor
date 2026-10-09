@@ -6,6 +6,19 @@ import { login } from "@/lib/api";
 import { useAuth } from "@/lib/store";
 import { toast } from "sonner";
 
+function landingFor(role?: string): string {
+  switch (role) {
+    case "teacher":
+    case "admin":
+      return "/teacher";
+    case "parent":
+      return "/parent";
+    case "student":
+    default:
+      return "/tutor";
+  }
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,8 +32,8 @@ export default function LoginPage() {
     try {
       const res = await login(email, password);
       setAuth(res.access_token, res.user);
-      toast.success("Welcome back!");
-      router.push("/tutor");
+      toast.success(`Welcome, ${res.user.full_name}`);
+      router.push(landingFor(res.user.role));
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || "Login failed");
     } finally {

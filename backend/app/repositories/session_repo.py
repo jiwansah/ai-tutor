@@ -36,3 +36,15 @@ class SessionRepository:
         self.db.add(a)
         await self.db.flush()
         return a
+
+
+    async def get_last_tutor_message(self, session_id):
+        from app.db.models.session import Message
+        stmt = (
+            select(Message)
+            .where(Message.session_id == session_id, Message.role == "tutor")
+            .order_by(Message.created_at.desc())
+            .limit(1)
+        )
+        return (await self.db.execute(stmt)).scalar_one_or_none()
+

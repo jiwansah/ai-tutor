@@ -50,7 +50,8 @@ def looks_like_reply(text: str) -> bool:
     return False
 
 
-_NEW_QUESTION_TEMPLATE = """Student mastery on this concept: {mastery:.2f} (0 = new, 1 = mastered)
+_NEW_QUESTION_TEMPLATE = """Student's class: {class_label}
+Student mastery on this concept: {mastery:.2f} (0 = new, 1 = mastered)
 
 Textbook context:
 {context}
@@ -94,6 +95,7 @@ def _private_answer_block(qv: dict | None) -> str:
     )
 
 
+
 def build_messages(
     *,
     mode: str,
@@ -103,9 +105,13 @@ def build_messages(
     verified_block: str,
     question: str,
     qv: dict | None = None,
+    system_override: str | None = None,
+    class_grade: int | None = None,          # ← NEW
 ) -> list[dict]:
+    system_content = system_override or get_system_prompt(mode)
+
     messages: list[dict] = [
-        {"role": "system", "content": get_system_prompt(mode)},
+        {"role": "system", "content": system_content},
     ]
     messages.extend(history)
 
@@ -121,7 +127,9 @@ def build_messages(
             reply=question,
         )
     else:
+        class_label = f"Class {class_grade}" if class_grade else "Unknown"
         content = _NEW_QUESTION_TEMPLATE.format(
+            class_label=class_label,
             mastery=mastery,
             context=context,
             verified_block=verified_block,

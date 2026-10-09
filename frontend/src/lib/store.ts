@@ -44,15 +44,18 @@ export interface ChatMessage {
   content: string;
   citations?: Citation[];
   verification?: Verification;
+  awaitingAnswers?: boolean;    // NEW
 }
 
 interface TutorState {
   sessionId: string | null;
   messages: ChatMessage[];
+  awaitingAnswers: boolean;                                      // NEW
   addMessage: (m: ChatMessage) => void;
   appendToLastTutor: (text: string) => void;
   setCitationsOnLastTutor: (citations: Citation[]) => void;
   setVerificationOnLastTutor: (v: Verification) => void;
+  setAwaitingAnswers: (v: boolean) => void;                      // NEW
   setSession: (id: string) => void;
   reset: () => void;
 }
@@ -60,6 +63,7 @@ interface TutorState {
 export const useTutorStore = create<TutorState>((set) => ({
   sessionId: null,
   messages: [],
+  awaitingAnswers: false,
 
   addMessage: (m) => set((s) => ({ messages: [...s.messages, m] })),
 
@@ -99,6 +103,7 @@ export const useTutorStore = create<TutorState>((set) => ({
       return { messages: msgs };
     }),
 
+  setAwaitingAnswers: (v) => set({ awaitingAnswers: v }),
   setSession: (id) => set({ sessionId: id }),
   reset: () => set({ sessionId: null, messages: [] }),
 }));

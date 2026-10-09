@@ -6,16 +6,44 @@
   <component name="ChangeListManager">
     <list default="true" id="793bdd69-6b2b-456c-8d48-665aff220580" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/LocalDeployment.txt" beforeDir="false" afterPath="$PROJECT_DIR$/LocalDeployment.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/alembic/versions/a44a503483d7_add_concept_graph.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/alembic/versions/a44a503483d7_add_concept_graph.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/app/api/router.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/router.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/api/v1/auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/v1/auth.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/api/v1/concepts.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/v1/concepts.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/api/v1/teacher.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/v1/teacher.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/app/api/v1/tutor.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/v1/tutor.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/app/db/models/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/db/models/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/db/models/concept.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/db/models/concept.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/db/models/user.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/db/models/user.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/prompts/evaluator.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/prompts/evaluator.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/app/prompts/tutor_modes.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/prompts/tutor_modes.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/repositories/concept_repo.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/repositories/concept_repo.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/repositories/session_repo.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/repositories/session_repo.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/schemas/auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/schemas/auth.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/conversation.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/conversation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/rag_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/rag_service.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/app/services/tutor_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/tutor_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/(auth)/login/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/(auth)/login/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/(auth)/register/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/(auth)/register/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/(teacher)/teacher/concepts/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/(teacher)/teacher/concepts/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/(teacher)/teacher/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/(teacher)/teacher/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/(tutor)/dashboard/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/(tutor)/dashboard/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/(tutor)/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/(tutor)/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/(tutor)/progress/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/(tutor)/progress/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/(tutor)/tutor/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/(tutor)/tutor/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/globals.css" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/globals.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/page.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/components/tutor/ChatWindow.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/tutor/ChatWindow.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/components/tutor/MessageBubble.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/tutor/MessageBubble.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/components/tutor/ModeSelector.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/tutor/ModeSelector.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/hooks/useTutor.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/hooks/useTutor.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/hooks/useTutorStream.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/hooks/useTutorStream.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/lib/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/lib/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/lib/store.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/lib/store.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/lib/teacherApi.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/lib/teacherApi.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -34,25 +62,25 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "/Users/saurabhranjan/Jiwan/Python/PythonProject/ai-tutor/ai-tutor",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.jshint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.jshint": "",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "ts.external.directory.path": "/Applications/PyCharm.app/Contents/plugins/javascript-plugin/jsLanguageServicesImpl/external"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/saurabhranjan/Jiwan/Python/PythonProject/ai-tutor/ai-tutor&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.jshint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.jshint&quot;: &quot;&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;/Applications/PyCharm.app/Contents/plugins/javascript-plugin/jsLanguageServicesImpl/external&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager">
     <configuration default="true" type="PythonConfigurationType" factoryName="Python">
       <module name="ai-tutor" />

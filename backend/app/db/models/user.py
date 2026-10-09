@@ -1,6 +1,6 @@
 import uuid
 import enum
-from sqlalchemy import String, Boolean, Enum as SAEnum
+from sqlalchemy import String, Boolean, Enum as SAEnum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base, TimestampMixin
@@ -24,5 +24,14 @@ class User(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     language: Mapped[str] = mapped_column(String(10), default="en")
 
-    student_profile = relationship("StudentProfile", back_populates="user", uselist=False,
-                                   cascade="all, delete-orphan")
+    # Enrollment (nullable; required for students in practice)
+    school_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("schools.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    class_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("classes.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    student_profile = relationship(
+        "StudentProfile", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )

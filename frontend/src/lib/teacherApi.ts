@@ -40,7 +40,10 @@ export const deleteChunks = (sectionId: string) =>
   api.delete(`/teacher/sections/${sectionId}/chunks`);
 
 // --- Concepts ---
-export const listConcepts = () => api.get("/teacher/concepts").then(r => r.data);
+export const listConcepts = (classId?: string) => {
+  const params = classId ? `?class_id=${classId}` : "";
+  return api.get(`/teacher/concepts${params}`).then(r => r.data);
+};
 export const createConcept = (p: any) => api.post("/teacher/concepts", p).then(r => r.data);
 export const updateConcept = (key: string, p: any) =>
   api.patch(`/teacher/concepts/${key}`, p).then(r => r.data);

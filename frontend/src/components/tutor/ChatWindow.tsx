@@ -4,83 +4,98 @@ import { Send, Sparkles } from "lucide-react";
 import { useTutor } from "@/hooks/useTutor";
 import { MessageBubble } from "./MessageBubble";
 import { ModeSelector } from "./ModeSelector";
-import { DiagnosticBanner } from "./DiagnosticBanner";
-
+import { ChapterPicker, type StudyScope } from "./ChapterPicker";
 
 export function ChatWindow() {
   const { messages, ask, loading } = useTutor();
   const [input, setInput] = useState("");
   const [mode, setMode] = useState("teacher");
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const [diagnostic, setDiagnostic] = useState<any>(null);
+  const [scope, setScope] = useState<StudyScope>({ subjectId: null, chapterId: null });
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages, loading]);
 
   async function handleSend() {
     if (!input.trim() || loading) return;
     const q = input;
     setInput("");
-    await ask(q, { mode });
+    await ask(q, {
+      mode,
+      subject_id: scope.subjectId ?? undefined,
+      chapter_id: scope.chapterId ?? undefined,
+    });
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="border-b px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-indigo-600" />
-          <h1 className="font-semibold text-lg">AI Tutor</h1>
-        </div>
-        <ModeSelector value={mode} onChange={setMode} />
-      </div>
-      <div> {diagnostic && <DiagnosticBanner diagnostic={diagnostic} />} </div>
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="text-center text-gray-500 mt-20">
-            <p className="text-lg">Ask me anything from your textbook</p>
-            <p className="text-sm mt-2">I'll teach you step by step</p>
+    <div className="h-full flex flex-col overflow-hidden bg-white">
+      {/* Controls bar */}
+      <div className="flex-shrink-0 border-b bg-white px-3 sm:px-6 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 mr-1">
+            <Sparkles className="w-4 h-4 text-indigo-600 hidden sm:block" />
+            <ModeSelector value={mode} onChange={setMode} />
           </div>
-        )}
-        {messages.map((m, i) => {
-          const isLastTutor =
-            m.role === "tutor" && i === messages.length - 1 && loading;
-          return (
-            <MessageBubble
-              key={i}
-              role={m.role}
-              content={m.content}
-              citations={m.citations}
-              verification={m.verification}
-              streaming={isLastTutor}
-            />
-          );
-        })}
-        <div ref={bottomRef} />
+          <ChapterPicker onChange={setScope} />
+        </div>
       </div>
 
-      <div className="border-t px-6 py-4">
-        <div className="flex gap-2">
+      {/* Messages — only scrollable region */}
+      <div
+        ref={scrollRef}
+        className="chat-scroll flex-1 min-h-0 px-3 sm:px-6 py-4"
+      >
+        <div className="space-y-4">
+          {messages.length === 0 && (
+            <div className="text-center text-gray-500 mt-16 sm:mt-20 px-6">
+              <p className="text-base sm:text-lg">Ask me anything from your textbook</p>
+              <p className="text-sm mt-2">I'll teach you step by step</p>
+            </div>
+          )}
+          {messages.map((m, i) => {
+            const isLastTutor =
+              m.role === "tutor" && i === messages.length - 1 && loading;
+            return (
+              <MessageBubble
+                key={i}
+                role={m.role}
+                content={m.content}
+                citations={m.citations}
+                verification={m.verification}
+                streaming={isLastTutor}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Input — pinned to bottom */}
+      <div className="flex-shrink-0 border-t bg-white px-3 sm:px-6 py-3">
+        <div className="flex gap-2 items-end max-w-4xl mx-auto">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 handleSend();
               }
             }}
-            placeholder="Ask a question… (Shift+Enter for new line)"
-            rows={2}
+            placeholder="Ask a question…"
+            rows={1}
             disabled={loading}
-            className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
+            className="flex-1 resize-none rounded-2xl border border-gray-300 px-4 py-2.5 text-base leading-6 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 max-h-32"
+            style={{ minHeight: "44px" }}
           />
           <button
             onClick={handleSend}
             disabled={loading || !input.trim()}
-            className="self-end rounded-lg bg-indigo-600 text-white px-4 py-2 font-medium hover:bg-indigo-700 disabled:opacity-50"
+            aria-label="Send"
+            className="flex-shrink-0 rounded-full bg-indigo-600 text-white w-11 h-11 flex items-center justify-center hover:bg-indigo-700 disabled:opacity-50"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-5 h-5" />
           </button>
         </div>
       </div>

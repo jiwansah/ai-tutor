@@ -1,8 +1,10 @@
 "use client";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
+import { api } from "@/lib/api";   // ← reuse the axios baseURL logic
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+// Extract the resolved base URL from the axios instance
+const API_URL = api.defaults.baseURL as string;
 
 export interface Citation {
   chapter: string;
@@ -22,9 +24,11 @@ export interface StreamHandlers {
   onToken?: (text: string) => void;
   onCitations?: (citations: Citation[]) => void;
   onVerification?: (v: Verification) => void;
-  onDone?: () => void;
-  onError?: (message: string) => void;
   onDiagnostic?: (d: any) => void;
+  onNoContext?: (msg: string) => void;
+  onMode?: (info: { mode: string }) => void;
+  onDone?: (info: { awaiting_answers?: boolean; effective_mode?: string }) => void;
+  onError?: (message: string) => void;
 }
 
 export function useTutorStream() {
@@ -48,9 +52,10 @@ export function useTutorStream() {
       abortRef.current = controller;
 
       try {
-        const token = typeof window !== "undefined"
-          ? localStorage.getItem("access_token")
-          : null;
+        const token =
+          typeof window !== "undefined"
+            ? localStorage.getItem("access_token")
+            : null;
 
         const res = await fetch(`${API_URL}/tutor/ask/stream`, {
           method: "POST",
@@ -101,9 +106,18 @@ export function useTutorStream() {
               case "token":        handlers.onToken?.(data.text ?? ""); break;
               case "citations":    handlers.onCitations?.(data.citations ?? []); break;
               case "verification": handlers.onVerification?.(data); break;
-              case "done":         handlers.onDone?.(); break;
-              case "error":        handlers.onError?.(data.message ?? "Unknown error"); break;
-              case "diagnostic": handlers.onDiagnostic?.(data); break;
+              case "diagnostic":   handlers.onDiagnostic?.(data); break;
+              case "no_context":   handlers.onNoContext?.(data.message ?? ""); break;
+              case "mode":         handlers.onMode?.(data); break;
+              case "done":
+                handlers.onDone?.({
+                  awaiting_answers: data.awaiting_answers === true,
+                  effective_mode: data.effective_mode,
+                });
+                break;
+              case "error":
+                handlers.onError?.(data.message ?? "Unknown error");
+                break;
             }
           }
         }
