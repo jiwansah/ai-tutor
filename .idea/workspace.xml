@@ -6,6 +6,11 @@
   <component name="ChangeListManager">
     <list default="true" id="793bdd69-6b2b-456c-8d48-665aff220580" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/api/router.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/router.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/db/models/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/db/models/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/app/(teacher)/teacher/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/(teacher)/teacher/layout.tsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

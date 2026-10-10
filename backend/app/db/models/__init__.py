@@ -6,6 +6,7 @@ from app.db.models.student import StudentProfile, ConceptMastery
 from app.db.models.session import TutorSession, Message, Attempt
 from app.db.models.concept import Concept, ConceptPrerequisite, ConceptMisconception
 from app.db.models.analytics import AnalyticsEvent, DailyRollup
+from app.db.models.ingest import IngestJob
 
 __all__ = [
     "User", "UserRole",
@@ -16,4 +17,5 @@ __all__ = [
     "Concept", "ConceptPrerequisite", "ConceptMisconception",
     "AnalyticsEvent", "DailyRollup",
     "AuditLog", "SafetyFlag",
+    "IngestJob",
 ]

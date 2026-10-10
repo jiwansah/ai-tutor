@@ -8,6 +8,7 @@ import { MobileMenu, type NavItem } from "@/components/nav/MobileMenu";
 const NAV: NavItem[] = [
   { href: "/teacher",             label: "Dashboard" },
   { href: "/teacher/curriculum",  label: "Curriculum" },
+  { href: "/teacher/ingest",      label: "Upload" },
   { href: "/teacher/concepts",    label: "Concepts" },
   { href: "/teacher/graph",       label: "Graph" },
   { href: "/teacher/analytics",   label: "Analytics" },
