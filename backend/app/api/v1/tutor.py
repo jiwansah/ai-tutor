@@ -11,7 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import decode_token
 from app.db.models.user import User
 from app.db.session import get_db, AsyncSessionLocal
-from app.prompts.no_context import get_no_context_prompt
+from app.prompts.no_context import get_no_context_prompt, requested_response_language
+from app.services.response_quality import _practice_response_is_malformed, _english_grammar_fallback
 from app.repositories.student_repo import StudentRepository
 from app.repositories.user_repo import UserRepository
 from app.repositories.session_repo import SessionRepository
@@ -244,7 +245,33 @@ async def ask_stream(
                 answer_key = {}
                 if assessment_mode:
                     # Keep assessment output buffered so the private key cannot leak.
-                    answer_text, answer_key = await generate_assessment(messages, mode=effective_mode, max_tokens=1800)
+                    answer_text, answer_key = await generate_assessment(messages, mode=effective_mode, max_tokens=1800, question=safety["text"])
+                    yield sse("token", {"text": answer_text})
+                elif effective_mode == "practice" and not has_context:
+                    # Buffer no-context practice output so language/quality checks can run
+                    # before any bad tokens are sent to the client. Streaming bad tokens
+                    # cannot be retracted after the fact.
+                    answer_text = await complete_chat(messages, temperature=0.2, max_tokens=1800)
+                    language = requested_response_language(safety["text"])
+                    if _practice_response_is_malformed(answer_text, language):
+                        repair_messages = [
+                            *messages,
+                            {"role": "assistant", "content": answer_text},
+                            {"role": "user", "content": (
+                                "REPAIR REQUIRED: Regenerate all three practice questions from scratch. "
+                                f"The entire response must be in {language}. "
+                                "Do not include any text in another language. "
+                                "If you include multiple-choice options, each option must be distinct, "
+                                "and exactly one option must be correct. Follow the practice-mode format."
+                            )},
+                        ]
+                        answer_text = await complete_chat(repair_messages, temperature=0.1, max_tokens=1800)
+                    if _practice_response_is_malformed(answer_text, language):
+                        answer_text = _english_grammar_fallback(safety["text"]) or (
+                            "I couldn't generate reliable practice questions just now. Please try again."
+                            if language == "English" else
+                            "मैं अभी विश्वसनीय अभ्यास प्रश्न नहीं बना पाया। कृपया फिर से प्रयास करें।"
+                        )
                     yield sse("token", {"text": answer_text})
                 else:
                     async for token in stream_chat(messages, temperature=0.4, max_tokens=1800):

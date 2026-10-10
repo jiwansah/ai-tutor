@@ -141,7 +141,7 @@ class TutorService:
         assessment_mode = effective_mode in ("quiz", "exam")
         answer_key = {}
         if assessment_mode:
-            answer, answer_key = await generate_assessment(messages, mode=effective_mode, max_tokens=1800)
+            answer, answer_key = await generate_assessment(messages, mode=effective_mode, max_tokens=1800, question=safety["text"])
         else:
             answer = await complete_chat(messages, temperature=0.4, max_tokens=1500)
 
