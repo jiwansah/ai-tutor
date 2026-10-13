@@ -5,12 +5,29 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="793bdd69-6b2b-456c-8d48-665aff220580" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/backend/app/prompts/exam_json.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/app/services/exam_builder.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_assessment_generation_recovery.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_assessment_quality_validation.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_quiz_followup_recovery.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/tests/test_three_modes.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/29e3bd40-da5c-44dc-825d-645c2a817ddd_fepr101.pdf" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/app/api/router.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/router.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/app/db/models/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/db/models/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/pyproject.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/app/(teacher)/teacher/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/app/(teacher)/teacher/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/api/v1/tutor.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/api/v1/tutor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/prompts/no_context.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/prompts/no_context.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/prompts/tutor_modes.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/prompts/tutor_modes.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/repositories/session_repo.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/repositories/session_repo.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/assessment_generation.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/assessment_generation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/conversation.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/conversation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/evaluator_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/evaluator_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/intent.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/intent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/quiz_grader.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/quiz_grader.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/tutor_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/tutor_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/tests/test_answer_key_grading.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/tests/test_answer_key_grading.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/components/tutor/ChatWindow.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/tutor/ChatWindow.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/components/tutor/ModeSelector.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/tutor/ModeSelector.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/hooks/useTutor.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/hooks/useTutor.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/lib/store.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/lib/store.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -19,6 +36,69 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="0.0" />
+      <entry key="S5" value="0.0" />
+      <entry key="S10" value="0.0" />
+      <entry key="S30" value="0.0" />
+      <entry key="S60" value="0.0" />
+      <entry key="M2" value="0.0" />
+      <entry key="M5" value="0.0" />
+      <entry key="M10" value="0.0" />
+      <entry key="M15" value="0.0" />
+      <entry key="M30" value="0.0" />
+      <entry key="H1" value="0.0" />
+      <entry key="H2" value="0.0" />
+      <entry key="H4" value="0.0" />
+      <entry key="D1" value="0.0" />
+      <entry key="W1" value="0.0" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="1.0" />
+      <entry key="MS500" value="1.0" />
+      <entry key="S2" value="1.0" />
+      <entry key="S5" value="1.0" />
+      <entry key="S10" value="1.0" />
+      <entry key="S30" value="1.0" />
+      <entry key="S60" value="1.0" />
+      <entry key="M2" value="1.0" />
+      <entry key="M5" value="1.0" />
+      <entry key="M10" value="1.0" />
+      <entry key="M15" value="1.0" />
+      <entry key="M30" value="1.0" />
+      <entry key="H1" value="1.0" />
+      <entry key="H2" value="1.0" />
+      <entry key="H4" value="1.0" />
+      <entry key="D1" value="1.0" />
+      <entry key="W1" value="1.0" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="2.4775624509317228E-15" />
+      <entry key="MS500" value="0.0011989606288233007" />
+      <entry key="S2" value="0.18608065689581743" />
+      <entry key="S5" value="0.5103645401384672" />
+      <entry key="S10" value="0.7143980264099749" />
+      <entry key="S30" value="0.8939503842034745" />
+      <entry key="S60" value="0.9454894944966202" />
+      <entry key="M2" value="0.972362840968648" />
+      <entry key="M5" value="0.9888521031021089" />
+      <entry key="M10" value="0.9944104299041261" />
+      <entry key="M15" value="0.9962701398067356" />
+      <entry key="M30" value="0.998133327670575" />
+      <entry key="H1" value="0.9990662278700922" />
+      <entry key="H2" value="0.999533004892831" />
+      <entry key="H4" value="0.9997664751794947" />
+      <entry key="D1" value="0.9999610754089695" />
+      <entry key="W1" value="0.9999944392513735" />
+    </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 1,
@@ -29,25 +109,26 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
-    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/saurabhranjan/Jiwan/Python/PythonProject/ai-tutor/ai-tutor&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.jshint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.jshint&quot;: &quot;&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;/Applications/PyCharm.app/Contents/plugins/javascript-plugin/jsLanguageServicesImpl/external&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "/Users/saurabhranjan/Jiwan/Python/PythonProject/ai-tutor/ai-tutor",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.jshint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.jshint": "",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "ts.external.directory.path": "/Applications/PyCharm.app/Contents/plugins/javascript-plugin/jsLanguageServicesImpl/external"
   }
-}</component>
+}]]></component>
   <component name="RunManager">
     <configuration default="true" type="PythonConfigurationType" factoryName="Python">
       <module name="ai-tutor" />

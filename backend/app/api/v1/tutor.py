@@ -1,7 +1,6 @@
 import json
 import time
 from typing import AsyncIterator
-
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -11,14 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import decode_token
 from app.db.models.user import User
 from app.db.session import get_db, AsyncSessionLocal
-from app.prompts.no_context import get_no_context_prompt, requested_response_language
-from app.services.response_quality import _practice_response_is_malformed, _english_grammar_fallback
+from app.prompts.no_context import get_no_context_prompt
 from app.repositories.student_repo import StudentRepository
 from app.repositories.user_repo import UserRepository
 from app.repositories.session_repo import SessionRepository
 from app.services.tutor_service import TutorService, _build_verified_block, _dedupe_citations, GUIDANCE_MODES
 from app.services.rag_service import RAGService
-from app.services.llm_service import stream_chat, complete_chat
+from app.services.llm_service import stream_chat
 from app.services.assessment_generation import generate_assessment
 from app.services.safety_service import check_input
 from app.services.math_verifier import verify_question, verify_answer
@@ -28,10 +26,11 @@ from app.services.concept_graph import (
 )
 from app.services.enrollment import enforce_section_access
 from app.services import analytics_service as A
-from app.services.intent import detect_intent
+from app.services.intent import detect_intent, normalize_mode, is_general_question
 from app.services.quiz_grader import extract_answer_key
 from app.db.models.curriculum import Class as ClassModel
 from sqlalchemy import select
+from app.db.models.curriculum import Subject as SubjectModel, Chapter as ChapterModel
 
 router = APIRouter()
 bearer = HTTPBearer(auto_error=True)
@@ -56,7 +55,7 @@ async def current_user(
 class AskRequest(BaseModel):
     session_id: str | None = None
     question: str = Field(min_length=1, max_length=2000)
-    mode: str = "teacher"
+    mode: str = "teaching"
     subject_id: str | None = None
     chapter_id: str | None = None
     section_id: str | None = None
@@ -136,14 +135,20 @@ async def ask_stream(
     user_class_id=None, inner_db=None):
 
     safety = await check_input(payload.question)
-    if payload.mode == "teacher":
-        detected = detect_intent(safety["text"])
-        effective_mode = detected or "teacher"
+    requested_mode = normalize_mode(payload.mode)
+    detected = detect_intent(safety["text"])
+    if (
+            detected is None
+            and requested_mode in ("exam", "quiz")
+            and is_general_question(safety["text"])
+    ):
+        effective_mode = "teaching"
     else:
-        effective_mode = payload.mode
+        effective_mode = normalize_mode(detected or requested_mode)
+    user_class_id = user.class_id
     grade = None
     if user_class_id:
-        grade = (await inner_db.execute(
+        grade = (await db.execute(
             select(ClassModel.grade).where(ClassModel.id == user_class_id)
         )).scalar_one_or_none()
 
@@ -171,13 +176,25 @@ async def ask_stream(
                 session = await sessions.get_or_create(
                     session_id=payload.session_id,
                     student_id=student.id,
-                    mode=payload.mode,
+                    mode=effective_mode,
                     subject_id=payload.subject_id,
                     chapter_id=payload.chapter_id,
                     section_id=payload.section_id,
                 )
 
-                history = await load_history(inner_db, session.id)
+                history = await load_history(
+                    inner_db, session.id,
+                    exclude_assessment=(effective_mode == "teaching"),
+                )
+                # Assessments are self-contained. Prior turns (especially failed
+                # generation attempts) confuse the small model. Drop history.
+                history_for_prompt = [] if effective_mode in ("quiz", "exam") else history
+
+                #history_for_prompt = [
+                #    m for m in history
+                #    if not (m["role"] == "assistant" and "couldn't generate" in m["content"].lower())
+                #] if effective_mode in ("quiz", "exam") else history
+
                 await sessions.add_message(session.id, "user", safety["text"])
                 await inner_db.commit()
 
@@ -219,8 +236,8 @@ async def ask_stream(
                     })
 
                 qv = verify_question(safety["text"])
-                verified_block = _build_verified_block(qv, mode=payload.mode)
-                NO_VERIFY_MODES = {"practice", "quiz", "exam"}
+                verified_block = _build_verified_block(qv, mode=effective_mode)
+                NO_VERIFY_MODES = {"quiz", "exam"}
                 if qv.get("is_math") and effective_mode not in GUIDANCE_MODES and effective_mode not in NO_VERIFY_MODES:
                     yield sse("pre_verify", {
                         "equation": qv["equation"],
@@ -230,7 +247,7 @@ async def ask_stream(
 
                 messages = build_messages(
                     mode=effective_mode,
-                    history=history,
+                    history=history_for_prompt,
                     context=diagnostic_block + context,
                     mastery=mastery,
                     verified_block=verified_block,
@@ -240,38 +257,49 @@ async def ask_stream(
                     class_grade=grade,  # ← NEW
                 )
 
+                subject_name = None
+                chapter_name = None
+                if payload.subject_id:
+                    subject_name = (await inner_db.execute(
+                        select(SubjectModel.name).where(SubjectModel.id == payload.subject_id)
+                    )).scalar_one_or_none()
+                if payload.chapter_id:
+                    chapter_name = (await inner_db.execute(
+                        select(ChapterModel.title).where(ChapterModel.id == payload.chapter_id)
+                    )).scalar_one_or_none()
+
                 full_answer: list[str] = []
-                assessment_mode = effective_mode in ("quiz", "exam")
                 answer_key = {}
-                if assessment_mode:
-                    # Keep assessment output buffered so the private key cannot leak.
-                    answer_text, answer_key = await generate_assessment(messages, mode=effective_mode, max_tokens=1800, question=safety["text"])
-                    yield sse("token", {"text": answer_text})
-                elif effective_mode == "practice" and not has_context:
-                    # Buffer no-context practice output so language/quality checks can run
-                    # before any bad tokens are sent to the client. Streaming bad tokens
-                    # cannot be retracted after the fact.
-                    answer_text = await complete_chat(messages, temperature=0.2, max_tokens=1800)
-                    language = requested_response_language(safety["text"])
-                    if _practice_response_is_malformed(answer_text, language):
-                        repair_messages = [
-                            *messages,
-                            {"role": "assistant", "content": answer_text},
-                            {"role": "user", "content": (
-                                "REPAIR REQUIRED: Regenerate all three practice questions from scratch. "
-                                f"The entire response must be in {language}. "
-                                "Do not include any text in another language. "
-                                "If you include multiple-choice options, each option must be distinct, "
-                                "and exactly one option must be correct. Follow the practice-mode format."
-                            )},
-                        ]
-                        answer_text = await complete_chat(repair_messages, temperature=0.1, max_tokens=1800)
-                    if _practice_response_is_malformed(answer_text, language):
-                        answer_text = _english_grammar_fallback(safety["text"]) or (
-                            "I couldn't generate reliable practice questions just now. Please try again."
-                            if language == "English" else
-                            "मैं अभी विश्वसनीय अभ्यास प्रश्न नहीं बना पाया। कृपया फिर से प्रयास करें।"
+                if effective_mode == "exam":
+                    if not has_context and payload.chapter_id:
+                        answer_text = (
+                            "I can't generate an exam for this chapter yet — no content "
+                            "has been ingested. Please ask your teacher to upload the "
+                            "chapter, or choose a chapter that has content."
                         )
+                    else:
+                        from app.services.exam_builder import generate_exam_paper
+                        from app.prompts.no_context import _exam_spec_for_grade, requested_response_language
+                        spec = _exam_spec_for_grade(grade)
+                        answer_text, answer_key = await generate_exam_paper(
+                            subject_name=subject_name or "",
+                            class_grade=grade,
+                            chapter_name=chapter_name,
+                            context=diagnostic_block + context,
+                            spec=spec,
+                            language=requested_response_language(safety["text"]),
+                        )
+                        if not answer_text:
+                            answer_text = (
+                                "I couldn't generate a valid exam paper. "
+                                "Please try a different chapter."
+                            )
+                            answer_key = {}
+                    yield sse("token", {"text": answer_text})
+                elif effective_mode == "quiz":
+                    answer_text, answer_key = await generate_assessment(
+                        messages, mode="quiz", max_tokens=1800, question=safety["text"],
+                    )
                     yield sse("token", {"text": answer_text})
                 else:
                     async for token in stream_chat(messages, temperature=0.4, max_tokens=1800):
@@ -283,13 +311,13 @@ async def ask_stream(
                 yield sse("citations", {"citations": citations})
                 yield sse("mode", {"mode": effective_mode})
 
-                NO_VERIFY_MODES = {"practice", "quiz", "exam"}
+                NO_VERIFY_MODES = {"quiz", "exam"}
                 verification = None
                 if qv.get("is_math") and effective_mode not in GUIDANCE_MODES and effective_mode not in NO_VERIFY_MODES:
                     verification = verify_answer(safety["text"], answer_text)
                     yield sse("verification", verification)
 
-                awaiting = payload.mode in ("practice", "quiz", "exam")
+                awaiting = effective_mode in ("quiz", "exam") and bool(answer_key)
                 await sessions.add_message(
                     session.id,
                     "tutor",
@@ -300,7 +328,7 @@ async def ask_stream(
                         "concept_key": concept_key,
                         "verification": verification,
                         "awaiting_answers": awaiting,
-                        "answer_key": {str(k): v for k, v in answer_key.items()} if assessment_mode else {},
+                        "answer_key": {str(k): v for k, v in answer_key.items()},
                     },
                 )
 
@@ -315,7 +343,7 @@ async def ask_stream(
                     class_id=user_class_id,
                     section_id=payload.section_id,
                     concept_key=concept_key,
-                    mode=payload.mode,
+                    mode=effective_mode,
                     duration_ms=duration_ms,
                 )
 
@@ -327,7 +355,7 @@ async def ask_stream(
                         school_id=user_school_id,
                         class_id=user_class_id,
                         concept_key=concept_key,
-                        mode=payload.mode,
+                        mode=effective_mode,
                         is_correct=verification["verified"],
                         was_verified=verification["verified"],
                     )
@@ -340,13 +368,13 @@ async def ask_stream(
                         school_id=user_school_id,
                         class_id=user_class_id,
                         concept_key=concept_key,
-                        mode=payload.mode,
+                        mode=effective_mode,
                         extra={"prerequisite": diag.get("recommended_prerequisite")},
                     )
                 # ---- /ANALYTICS ----
 
                 await inner_db.commit()
-                awaiting = effective_mode in ("practice", "quiz", "exam")
+                awaiting = effective_mode in ("quiz", "exam") and bool(answer_key)
                 yield sse("done", {"awaiting_answers": awaiting, "effective_mode": effective_mode})
 
         except Exception as e:

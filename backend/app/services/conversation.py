@@ -7,13 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.session import Message
 from app.prompts.tutor_modes import get_system_prompt
-from app.prompts.no_context import requested_response_language
+from app.prompts.no_context import build_exam_system, requested_response_language
 
 MAX_HISTORY_MESSAGES = 8
 
 
 async def load_history(
     db: AsyncSession, session_id, limit: int = MAX_HISTORY_MESSAGES,
+    *, exclude_assessment: bool = False,
 ) -> list[dict]:
     stmt = (
         select(Message)
@@ -23,10 +24,19 @@ async def load_history(
     )
     rows = list((await db.execute(stmt)).scalars().all())
     rows.reverse()
-    return [
-        {"role": "assistant" if m.role == "tutor" else "user", "content": m.content}
-        for m in rows
-    ]
+
+    out: list[dict] = []
+    for m in rows:
+        meta = m.meta or {}
+        # Skip messages that came from exam/quiz generation.
+        # They poison the LLM into repeating paper format.
+        if exclude_assessment and meta.get("mode") in ("exam", "quiz"):
+            continue
+        out.append({
+            "role": "assistant" if m.role == "tutor" else "user",
+            "content": m.content,
+        })
+    return out
 
 
 _QUESTION_MARKERS = re.compile(
@@ -108,8 +118,32 @@ def build_messages(
     qv: dict | None = None,
     system_override: str | None = None,
     class_grade: int | None = None,          # ← NEW
+    subject_name: str | None = None,  # NEW
+    chapter_name: str | None = None,  # NEW
 ) -> list[dict]:
-    system_content = system_override or get_system_prompt(mode)
+    if system_override:
+        system_content = system_override
+    elif mode == "exam":
+        # Use the formal exam blueprint even when textbook retrieval succeeds.
+        system_content = build_exam_system(class_grade, use_textbook_context=True)
+    else:
+        system_content = get_system_prompt(mode)
+
+        # Append subject/chapter context to the system message
+    if subject_name or chapter_name:
+        anchor = "\n\nSTUDENT IS STUDYING: "
+        parts = []
+        if subject_name:
+            parts.append(f"Subject = {subject_name}")
+        if chapter_name:
+            parts.append(f"Chapter = {chapter_name}")
+        anchor += " | ".join(parts)
+        anchor += (
+            "\nAll questions and content MUST relate to this subject and chapter. "
+            "Never write questions about other subjects (e.g., if Subject = English, "
+            "do not write questions about science, geography, or history)."
+        )
+        system_content += anchor
 
     # The latest request wins over language inferred from earlier chat history.
     # Apply this to every mode, including teacher mode and no-context answers.

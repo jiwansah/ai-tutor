@@ -17,7 +17,13 @@ class SessionRepository:
         if session_id:
             existing = await self.get(session_id)
             if existing:
-                return existing
+                # If the mode changed, start a fresh session.
+                # Otherwise the old exam paper stays in history and the LLM
+                # keeps producing exam-shaped responses in teaching mode.
+                if existing.mode != mode:
+                    session_id = None
+                else:
+                    return existing
         s = TutorSession(student_id=student_id, mode=mode,
                          subject_id=subject_id, chapter_id=chapter_id, section_id=section_id)
         self.db.add(s)

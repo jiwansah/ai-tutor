@@ -36,3 +36,9 @@ def test_evaluator_accepts_answer_key_arguments():
     fn = next(n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == "evaluate_answers")
     names = {arg.arg for arg in fn.args.kwonlyargs}
     assert {"answer_key", "assessment_mode"} <= names
+
+
+def test_removes_multiple_private_markers():
+    visible, key = extract_answer_key("Quiz text\n[[ANSWER_KEY:1=A]]\n[[ANSWER_KEY:1=B]]")
+    assert "ANSWER_KEY" not in visible
+    assert key == {1: "A"}

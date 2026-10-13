@@ -2,11 +2,6 @@
 
 const MODES = [
   { id: "teacher",  label: "Teacher" },
-  { id: "socratic", label: "Socratic" },
-  { id: "hint",     label: "Hint" },
-  { id: "practice", label: "Practice" },
-  { id: "revision", label: "Revision" },
-  { id: "doubt",    label: "Doubt" },
   { id: "exam",     label: "Exam" },
   { id: "quiz",     label: "Quiz" },
 ];

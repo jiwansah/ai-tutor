@@ -105,5 +105,5 @@ export const useTutorStore = create<TutorState>((set) => ({
 
   setAwaitingAnswers: (v) => set({ awaitingAnswers: v }),
   setSession: (id) => set({ sessionId: id }),
-  reset: () => set({ sessionId: null, messages: [] }),
+  reset: () => set({ sessionId: null, messages: [], awaitingAnswers: false }),
 }));

@@ -14,6 +14,7 @@ from app.services.math_verifier import verify_question, verify_answer
 from app.services.quiz_grader import grade_quiz, grade_with_answer_key
 from app.prompts.evaluator import EVALUATOR_SYSTEM, EVALUATOR_USER
 from app.config import settings
+from app.services.quiz_grader import parse_student_answers
 
 
 def _looks_like_math_message(text: str) -> bool:
@@ -51,8 +52,7 @@ async def evaluate_answers(
     if keyed is not None:
         return keyed
 
-    # ---- Path 1: Deterministic grader for MCQs (works for math AND any
-    #              MCQ where the correct option can be inferred) ----
+    # ---- Path 1: Deterministic grader for MCQs ----
     deterministic = grade_quiz(tutor_message, student_answer)
     if deterministic is not None:
         return deterministic
@@ -76,7 +76,7 @@ async def evaluate_answers(
                 "source": "sympy",
             }
 
-    # ---- If it's a math question but we couldn't parse it → refuse (no LLM lies) ----
+    # ---- Path 3: Refuse math questions we couldn't parse ----
     if _looks_like_math_message(tutor_message):
         return {
             "is_correct": False,
@@ -91,7 +91,7 @@ async def evaluate_answers(
             "source": "unsupported_math",
         }
 
-    # Quiz/exam grading must not guess when its generation-time key is missing.
+    # ---- Path 4: Assessment without a key — refuse, never guess ----
     if assessment_mode:
         return {
             "is_correct": False,
@@ -100,27 +100,27 @@ async def evaluate_answers(
             "correct_answers": [],
             "score_percent": 0,
             "feedback": (
-                "This assessment is missing its grading key, so I cannot score it reliably. "
-                "Please generate a new quiz or exam and try again."
+                "Your answers have been saved for your teacher to review. "
+                "I couldn't auto-grade this exam (the grading key was not saved with it). "
+                "Please ask your teacher to grade your responses, or regenerate the exam."
             ),
-            "source": "missing_answer_key",
+            "source": "answers_recorded_no_key",
         }
 
-    # ---- Path 3: Non-math → LLM grader (best-effort only, not guaranteed exact) ----
-    raw = await complete(
-        prompt=EVALUATOR_USER.format(
-            tutor_message=tutor_message[:4000],
-            student_answer=student_answer[:2000],
-        ),
-        system=EVALUATOR_SYSTEM,
-        model=settings.LLM_MODEL_LARGE,   # phi4-mini is fine for MCQs
-        temperature=0.0,
-        max_tokens=600,
-        json_mode=True,
-    )
-
-    raw = _strip_json_wrappers(raw)
+    # ---- Path 5: Non-math fallback — LLM grader (best-effort) ----
     try:
+        raw = await complete(
+            prompt=EVALUATOR_USER.format(
+                tutor_message=tutor_message[:4000],
+                student_answer=student_answer[:2000],
+            ),
+            system=EVALUATOR_SYSTEM,
+            model=settings.LLM_MODEL_LARGE,
+            temperature=0.0,
+            max_tokens=600,
+            json_mode=True,
+        )
+        raw = _strip_json_wrappers(raw)
         data = json.loads(raw)
         data.setdefault("is_correct", False)
         data.setdefault("per_question_correct", [])
@@ -131,12 +131,16 @@ async def evaluate_answers(
         data["source"] = "llm"
         return data
     except Exception:
+        # Final safety net: never raise, never return None.
         return {
             "is_correct": False,
             "per_question_correct": [],
             "student_answers": [student_answer],
             "correct_answers": [],
             "score_percent": 0,
-            "feedback": "I couldn't grade that answer. Please try again.",
+            "feedback": (
+                "I couldn't grade that answer automatically. "
+                "Please re-check your work or ask your teacher."
+            ),
             "source": "llm_parse_error",
         }

@@ -5,6 +5,7 @@ import { useTutor } from "@/hooks/useTutor";
 import { MessageBubble } from "./MessageBubble";
 import { ModeSelector } from "./ModeSelector";
 import { ChapterPicker, type StudyScope } from "./ChapterPicker";
+import { useTutorStore } from "@/lib/store";
 
 export function ChatWindow() {
   const { messages, ask, loading, awaitingAnswers } = useTutor();
@@ -12,11 +13,14 @@ export function ChatWindow() {
   const [mode, setMode] = useState("teacher");
   const [scope, setScope] = useState<StudyScope>({ subjectId: null, chapterId: null });
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sessionId = useTutorStore((s) => s.sessionId);
+  const resetSession = useTutorStore((s) => s.reset);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, loading]);
+    if (sessionId) resetSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+  // When the user changes mode, start a fresh session.
 
   async function handleSend() {
     if (!input.trim() || loading) return;

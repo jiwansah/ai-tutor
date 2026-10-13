@@ -150,12 +150,13 @@ LANGUAGE: Full response in the student's language.
 
 
 # Class-scaled exam blueprint
+# Written-response exams. No MCQs, no optional questions.
 _EXAM_SPEC = {
-    (1, 3):  {"mins": 15, "marks": 10, "mcq": 3, "short": 2, "long": 0},
-    (4, 5):  {"mins": 30, "marks": 20, "mcq": 4, "short": 3, "long": 0},
-    (6, 8):  {"mins": 45, "marks": 30, "mcq": 4, "short": 3, "long": 1},
-    (9, 10): {"mins": 60, "marks": 40, "mcq": 4, "short": 3, "long": 2},
-    (11, 12):{"mins": 90, "marks": 50, "mcq": 4, "short": 3, "long": 3},
+    (1, 3):  {"mins": 20, "marks": 15, "short": 5, "long": 0, "short_mark": 3,  "long_mark": 0},
+    (4, 5):  {"mins": 30, "marks": 25, "short": 5, "long": 1, "short_mark": 3,  "long_mark": 10},
+    (6, 8):  {"mins": 45, "marks": 40, "short": 4, "long": 2, "short_mark": 5,  "long_mark": 10},
+    (9, 10): {"mins": 60, "marks": 50, "short": 4, "long": 3, "short_mark": 5,  "long_mark": 10},
+    (11, 12):{"mins": 90, "marks": 60, "short": 5, "long": 3, "short_mark": 6,  "long_mark": 10},
 }
 
 
@@ -168,116 +169,104 @@ def _exam_spec_for_grade(grade: int | None) -> dict:
     return _EXAM_SPEC[(6, 8)]
 
 
-def build_exam_system(grade: int | None) -> str:
+def build_exam_system(grade: int | None, *, use_textbook_context: bool = False) -> str:
     spec = _exam_spec_for_grade(grade)
     grade_label = f"Class {grade}" if grade else "school"
-    calibration = _calibration(grade)
-    # Precompute mark totals per section
-    section_a_marks = spec["mcq"] * 1
-    section_b_marks = spec["short"] * 2
-    section_c_marks = spec["long"] * 5
-    total_q = spec["mcq"] + spec["short"] + spec["long"]
 
-    # Optionally drop Section C for young classes
-    include_section_c = spec["long"] > 0
+    section_a_marks = spec["short"] * spec["short_mark"]
+    section_b_marks = spec["long"] * spec["long_mark"]
+    total_q = spec["short"] + spec["long"]
 
-    return f"""You are a school examiner setting a formal exam paper for {grade_label} students.
+    content_rule = (
+        "Every question must be answerable from the supplied textbook chapter. "
+        "Do NOT bring in facts from other chapters or general knowledge."
+        if use_textbook_context else
+        "Write a general practice paper, clearly labelled as not from the textbook."
+    )
 
-=== FORMATTING RULES (follow exactly) ===
-- Put each QUESTION on its own line.
-- Leave ONE BLANK LINE between the question text and the options.
-- Put each option (A, B, C, D) on its OWN LINE.
-- Leave ONE BLANK LINE after each question block.
-- Use **bold** only for section headings and question numbers.
-- Never combine multiple options on one line.
-- Number questions continuously: 1, 2, 3, … across sections.
-- Show marks in square brackets at the END of each question, right-aligned.
+    section_b_instructions = ""
+    if spec["long"] > 0:
+        section_b_instructions = (
+            f"Section B: exactly {spec['long']} long-answer question(s), each worth "
+            f"{spec['long_mark']} marks. Number them {spec['short'] + 1} through {total_q}."
+        )
 
-=== OUTPUT TEMPLATE (follow this exact structure) ===
+    return f"""You are a school examiner. Write ONE exam paper for {grade_label}.
 
-📚 General practice paper — not from your textbook
+CONTENT: {content_rule}
 
-**Subject:** <subject name>
-**Class:** {grade or '—'}
-**Time:** {spec['mins']} minutes
-**Maximum Marks:** {spec['marks']}
+EXACT COUNTS — you must match these exactly:
+- Total questions: {total_q}
+- Section A: exactly {spec['short']} short-answer question(s), each worth {spec['short_mark']} marks.
+- {section_b_instructions if section_b_instructions else "Section B: skip."}
 
-**INSTRUCTIONS**
-1. All questions are compulsory.
-2. Write answers in the space provided.
-3. Marks for each question are shown in the square brackets.
+RULES:
+- Every question is compulsory. No "answer any N of M".
+- All questions are written-response (no MCQs, no true/false).
+- Number questions 1 through {total_q} continuously across sections.
+- Do NOT write answers next to the questions. No parenthetical answers.
+- Do NOT write any instructions about the exam to the model. Only the paper.
+- Do NOT output angle-bracket placeholders. Every line must be real content.
 
----
+OUTPUT FORMAT — write exactly these lines in this order:
 
-**SECTION A — Objective ({section_a_marks} marks)**
+Line 1: 📚 Chapter-Based Exam Paper
+Line 2: (blank)
+Line 3: **Subject:** English Literature
+Line 4: **Class:** {grade or '—'}
+Line 5: **Time:** {spec['mins']} minutes
+Line 6: **Maximum Marks:** {spec['marks']}
+Line 7: (blank)
+Line 8: **INSTRUCTIONS**
+Line 9: 1. All questions are compulsory.
+Line 10: 2. Write answers in your own words.
+Line 11: 3. Marks for each question are shown in square brackets.
+Line 12: (blank)
+Line 13: ---
+Line 14: (blank)
+Line 15: **SECTION A — Short Answer ({section_a_marks} marks)**
+Line 16: (blank)
 
-**1.** <MCQ question text>
+Then for each Section A question, write:
+**<number>.** <the question text in one sentence>
+(blank line)
+[<marks>]
 
-A) <option>
-B) <option>
-C) <option>
-D) <option>
+Example of a single Section A question, written literally (do not copy these words — write your own):
 
-[1]
-
-**2.** <MCQ question text>
-
-A) <option>
-B) <option>
-C) <option>
-D) <option>
-
-[1]
-
-… continue for {spec['mcq']} MCQs …
-
----
-
-**SECTION B — Short Answer ({section_b_marks} marks)**
-
-**{spec['mcq']+1}.** <Short-answer question>
-
-[2]
-
-**{spec['mcq']+2}.** <Short-answer question>
-
-[2]
-
-… continue for {spec['short']} short-answer questions …
-
-{"" if not include_section_c else f'''---
-
-**SECTION C — Long Answer ({section_c_marks} marks)**
-
-**{spec['mcq']+spec['short']+1}.** <Long-answer question>
-
+**1.** Why did Rama Natha refuse to believe the sage's advice at first?
+(blank line)
 [5]
 
-… continue for {spec['long']} long-answer questions …
-'''}
+After all {spec['short']} Section A questions, write:
+
 ---
+(blank)
+**SECTION B — Long Answer ({section_b_marks} marks)**
+(blank)
 
+Then each Section B question in the same format, numbered {spec['short'] + 1} onward.
+
+After the last question, write:
+
+---
+(blank)
 **END OF PAPER**
-
+(blank)
 **Total Questions:** {total_q}  **Time:** {spec['mins']} minutes  **Maximum Marks:** {spec['marks']}
+(blank)
 
-=== FORBIDDEN ===
-- Do NOT provide a student-visible answer key.
-- Do NOT solve any question in the visible paper.
-- Do NOT say "Correct!".
-- The visible paper must end at "END OF PAPER".
+Then the VERY LAST LINE of your response must be the answer-key marker:
 
-INTERNAL GRADING KEY (required, not part of the visible paper): After the visible
-paper, append exactly one machine-readable marker. Include EVERY question number in the
-paper, not just the first three. Example for a 5-question paper:
-[[ANSWER_KEY:1=B,2=D,3=A,4=photosynthesis,5=chlorophyll]]. For each MCQ, use the
-correct option letter. For each short/long answer, use a concise canonical expected
-answer after the equals sign. Do not omit any question. The backend removes this marker
-before displaying the paper. Keep numbering stable and questions objectively gradable.
+[ANSWER_KEY:1=<your 1-sentence model answer for Q1>,2=<your model answer for Q2>,...,{total_q}=<your model answer for Q{total_q}>]
 
-LANGUAGE: Follow the latest user request. If the user asks for English or English
-grammar, write the entire paper, all questions, and all options in English, regardless
-of earlier conversation language. Otherwise use the language of the latest request.
+KEY RULES:
+- The marker must be the last line. Nothing after it.
+- One entry per question, comma-separated, no spaces inside.
+- Each model answer: 1 short sentence. Do NOT copy the placeholder text.
+- Replace <your model answer for Q1> etc. with real sentences.
+
+LANGUAGE: Write everything in the language of the student's latest request. English request → English. Hindi request → Hindi in Devanagari.
 """
 
 def get_no_context_prompt(mode: str, grade: int | None = None) -> str:

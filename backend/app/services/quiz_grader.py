@@ -209,63 +209,148 @@ def _resolve_letter(student_ans: str, q: dict) -> str | None:
     return None
 
 
-# Internal answer key format: [[ANSWER_KEY:1=A,2=C,3=B]]
-_ANSWER_KEY_RE = re.compile(r"\[\[ANSWER_KEY\s*:\s*(.*?)\s*\]\]", re.IGNORECASE)
+# Internal answer key format — accepts either:
+#   [ANSWER_KEY:1=A,2=C,3=B]  or  [[ANSWER_KEY:...]]      (inline)
+#   **ANSWER_KEY:**\n1. A\n2. B\n...                       (block, LLM drift)
+_ANSWER_KEY_INLINE_RE = re.compile(r"\[+\s*ANSWER_KEY\s*:\s*(.*?)\s*\]+", re.IGNORECASE)
+_ANSWER_KEY_BLOCK_MARKER_RE = re.compile(
+    r"(?im)^\s*\*{0,2}\s*ANSWER[_ ]KEY\s*\*{0,2}\s*:?\s*$"
+)
+_ANSWER_KEY_BLOCK_LINE_RE = re.compile(
+    r"(?m)^\s*(\d+)\s*[.):\-]\s*(.+?)\s*$"
+)
+
+
+def _truncate_key_value(value: str) -> str:
+    value = value.strip()
+    if len(value) > 200:
+        value = value[:200].rstrip() + "…"
+    return value
 
 
 def extract_answer_key(text: str) -> tuple[str, dict[int, str]]:
-    """Remove the internal key marker from display text and return parsed keys."""
-    match = _ANSWER_KEY_RE.search(text or "")
-    if not match:
-        return (text or "").strip(), {}
-    key: dict[int, str] = {}
-    for item in match.group(1).split(","):
-        parsed = re.fullmatch(r"\s*(\d+)\s*=\s*(.*?)\s*", item)
-        if parsed and parsed.group(2):
-            key[int(parsed.group(1))] = parsed.group(2).strip()
-    clean = ((text or "")[:match.start()] + (text or "")[match.end():]).strip()
-    return clean, key
+    """Extract the internal key marker from the LLM output and return it.
+
+    Two shapes are supported:
+      1. Inline:  [ANSWER_KEY:1=A,2=C,3=B]  or  [[ANSWER_KEY:...]]
+      2. Block:   **ANSWER_KEY:**  followed by numbered lines (1. A / 2. B / ...)
+    """
+    source = text or ""
+
+    # ---- Shape 1: inline marker ----
+    m = _ANSWER_KEY_INLINE_RE.search(source)
+    if m:
+        key: dict[int, str] = {}
+        for item in m.group(1).split(","):
+            parsed = re.fullmatch(r"\s*(\d+)\s*=\s*(.*?)\s*", item)
+            if parsed and parsed.group(2):
+                key[int(parsed.group(1))] = _truncate_key_value(parsed.group(2))
+        clean = _ANSWER_KEY_INLINE_RE.sub("", source).strip()
+        return clean, key
+
+    # ---- Shape 2: block form ----
+    marker = _ANSWER_KEY_BLOCK_MARKER_RE.search(source)
+    if marker:
+        body = source[marker.end():]
+        key: dict[int, str] = {}
+        for line_m in _ANSWER_KEY_BLOCK_LINE_RE.finditer(body):
+            num = int(line_m.group(1))
+            value = line_m.group(2).strip()
+            if not value:
+                continue
+            if re.match(r"^(?:END OF|Total|Time|Marks|Duration|Notes)\b", value, re.I):
+                break
+            key[num] = _truncate_key_value(value)
+        if key:
+            clean = source[:marker.start()].rstrip()
+            return clean, key
+
+    # ---- No key found - strip malformed markers so nothing leaks ----
+    clean = re.sub(
+        r"\[+\s*ANSWER_KEY\b[^\]]*(?:\]+|$)", "", source, flags=re.IGNORECASE
+    ).strip()
+    clean = _ANSWER_KEY_BLOCK_MARKER_RE.sub("", clean).strip()
+    return clean, {}
 
 
-def grade_with_answer_key(student_answer: str, answer_key: dict[int, str]) -> dict[str, Any] | None:
-    """Grade against the key saved with the exact generated quiz/exam."""
+def grade_with_answer_key(
+    student_answer: str, answer_key: dict[int, str]
+) -> dict[str, Any] | None:
+    """
+    Grade against the key saved with the exact generated quiz/exam.
+
+    - MCQ keys (single letters A-D) → exact-match grading.
+    - Written keys (prose) → keyword-overlap scoring, and reveal the
+      model answers so the student can self-check.
+    Returns None only when there is no key at all.
+    """
     if not answer_key:
         return None
+
     answers = parse_student_answers(student_answer)
-    # If there is one question and the learner gave a plain response, accept it as Q1.
     if not answers and len(answer_key) == 1 and student_answer.strip():
         answers = {next(iter(answer_key)): student_answer.strip()}
-    per_correct = []
-    student_values = []
-    correct_values = []
+
+    # Detect written-answer mode: any key value is longer than a single letter.
+    is_written = any(
+        not re.fullmatch(r"[A-Da-d]", str(v).strip())
+        for v in answer_key.values()
+    )
+
+    per_correct: list[bool] = []
+    student_values: list[str] = []
+    correct_values: list[str] = []
+
+    def _keywords(text: str) -> set[str]:
+        words = re.findall(r"\w+", (text or "").lower())
+        return {w for w in words if len(w) > 2}
+
     for num in sorted(answer_key):
-        expected = answer_key[num].strip()
-        supplied = answers.get(num, "")
-        # Keys A-D indicate MCQ: accept either its letter or the full keyed value
-        # only when the key was authored as a value rather than a letter.
-        if re.fullmatch(r"[A-Da-d]", expected):
-            normalized_expected = expected.upper()
-            normalized_supplied = supplied.strip().upper()
-            is_correct = normalized_supplied == normalized_expected
-        else:
-            is_correct = _normalise_answer(supplied) == _normalise_answer(expected)
-        student_values.append(supplied or "?")
+        expected = str(answer_key[num]).strip()
+        supplied = str(answers.get(num, "") or "").strip()
+        student_values.append(supplied or "—")
         correct_values.append(expected)
+
+        if re.fullmatch(r"[A-Da-d]", expected):
+            # MCQ: exact letter match
+            is_correct = supplied.upper() == expected.upper()
+        else:
+            # Written: keyword overlap (rough hint)
+            s_words = _keywords(supplied)
+            e_words = _keywords(expected)
+            if not s_words or not e_words:
+                is_correct = False
+            else:
+                overlap = len(s_words & e_words)
+                is_correct = overlap >= 2 or (overlap >= 1 and len(e_words) <= 3)
         per_correct.append(is_correct)
+
     total = len(per_correct)
     count = sum(per_correct)
+    score = round(count * 100 / total) if total else 0
+
+    if is_written:
+        feedback = (
+            f"{count} of {total} answers had matching keywords. "
+            "ⓘ Rough auto-hint, not a final score. Compare with the correct "
+            "answers below, then confirm with your teacher."
+        )
+        source = "answer_revealed"
+    else:
+        feedback = f"{count} out of {total} correct." + (
+            "" if count == total else " Check the questions marked incorrect."
+        )
+        source = "answer_key"
+
     return {
         "is_correct": count == total,
         "per_question_correct": per_correct,
         "student_answers": student_values,
         "correct_answers": correct_values,
-        "score_percent": round(count * 100 / total) if total else 0,
-        "feedback": f"{count} out of {total} correct." + (
-            "" if count == total else " Check the questions marked incorrect."
-        ),
-        "source": "answer_key",
+        "score_percent": score,
+        "feedback": feedback,
+        "source": source,
     }
-
 
 # ---------------------------------------------------------------
 # Top-level grader

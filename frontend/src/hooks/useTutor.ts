@@ -11,6 +11,23 @@ export interface AskOptions {
   section_id?: string;
 }
 
+function looksLikeAnswer(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  // If it starts with a question word or has "?", it's a new question
+  if (/^(?:what|why|how|who|when|where|which|can you|explain|tell me|help|please)/i.test(t)) {
+    return false;
+  }
+  if (t.includes("?")) return false;
+  // If it looks like "1 A, 2 B" or "x=4" — treat as an answer
+  if (/^\s*\d+\s*[\.")\-:]?\s*(?:[A-Da-d]|\d|[\w\u0900-\u097F])/m.test(t)) {
+    return true;
+  }
+  // Short single-line responses are likely answers
+  if (t.length < 120) return true;
+  return false;
+}
+
 export function useTutor() {
   const {
     messages,
@@ -29,7 +46,9 @@ export function useTutor() {
     if (!question.trim()) return;
 
     // If the tutor is waiting for answers, route this to the grader
-    if (awaitingAnswers && sessionId) {
+        // If the tutor is waiting for answers, route to the grader —
+    // BUT only if the message looks like an answer, not a new question.
+    if (awaitingAnswers && sessionId && looksLikeAnswer(question)) {
       await submitAnswer(question, opts);
       return;
     }
@@ -78,7 +97,6 @@ export function useTutor() {
         student_answer: answer,
       });
 
-      // Compose the result as a formatted message
       const correct = data.is_correct;
       const score = data.score_percent ?? 0;
       const feedback = data.feedback || "";
@@ -89,17 +107,17 @@ export function useTutor() {
       const emoji = correct ? "✅" : score >= 50 ? "📊" : "📉";
       let body = `${emoji} **Score: ${score}%**\n\n${feedback}\n\n`;
 
-      if (perQ.length > 0) {
-        body += "**Breakdown:**\n";
-        perQ.forEach((ok: boolean, i: number) => {
-          const mark = ok ? "✅" : "❌";
+      if (correct_answers.length > 0) {
+        body += "---\n\n**Correct answers:**\n";
+        correct_answers.forEach((right: string, i: number) => {
+          const mark = perQ[i] ? "✅" : "❌";
           const yours = student_answers[i] ?? "—";
-          const right = correct_answers[i] ?? "—";
-          body += `${mark} Q${i + 1}: you said **${yours}**, correct was **${right}**\n`;
+          body += `\n${mark} **Q${i + 1}**\n`;
+          body += `You said: ${yours}\n`;
+          body += `Correct: **${right}**\n`;
         });
       }
 
-      // Replace the empty tutor bubble with the graded response
       appendToLastTutor(body);
 
       // After grading, stop waiting for more answers
