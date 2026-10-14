@@ -29,12 +29,14 @@ def get_session_repo(db: AsyncSession = Depends(get_db)) -> SessionRepository:
 def get_auth_service(repo: UserRepository = Depends(get_user_repo)) -> AuthService:
     return AuthService(repo)
 
+'''
 def get_tutor_service(
     s: SessionRepository = Depends(get_session_repo),
     st: StudentRepository = Depends(get_student_repo),
     c: ContentRepository = Depends(get_content_repo),
 ) -> TutorService:
     return TutorService(s, st, c)
+'''
 
 def get_rag_service(c: ContentRepository = Depends(get_content_repo)) -> RAGService:
     return RAGService(c)

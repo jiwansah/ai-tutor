@@ -94,6 +94,7 @@ class TutorService:
         self.students = StudentRepository(db)
         self.rag = RAGService(db)
 
+    '''
     async def ask(
         self,
         *,
@@ -314,6 +315,7 @@ class TutorService:
             "no_context": not has_context,
             "awaiting_answers": mode in ("quiz", "exam"),  # NEW
         }
+        '''
 
     async def submit_answer(
         self,
@@ -331,6 +333,21 @@ class TutorService:
         # Load the tutor's previous message so the grader knows what was asked
         last_tutor = await self.sessions.get_last_tutor_message(session_id)
         tutor_text = last_tutor.content if last_tutor else ""
+
+        # ── Resolve concept_key from the session if the caller didn't provide one ──
+        # Quiz/exam generation happens before we know the concept, so the frontend
+        # never sends concept_key. We infer it from the session's section/chapter.
+        if not concept_key:
+            session = await self.sessions.get(session_id)
+            if session:
+                if session.section_id:
+                    from app.services.concept_graph import resolve_concept_for_section
+                    concept_key = await resolve_concept_for_section(self.db, session.section_id)
+                if not concept_key and session.chapter_id:
+                    concept_key = f"chapter:{session.chapter_id}"
+                if not concept_key and session.subject_id:
+                    concept_key = f"subject:{session.subject_id}"
+
         # The key is stored as message metadata and never sent to the student.
         # The key is stored as message metadata and never sent to the student.
         # Small models can drift; also try to recover key from the exam text.
@@ -381,7 +398,7 @@ class TutorService:
         # Log the attempt
         await self.sessions.log_attempt(
             student_id=student_id,
-            concept_key=concept_key or "unknown",
+            concept_key=concept_key or f"session:{session_id}",
             question=question,
             answer=student_answer,
             is_correct=is_correct,

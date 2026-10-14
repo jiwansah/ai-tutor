@@ -21,7 +21,7 @@ export default function ProgressPage() {
           )}
           <ul className="space-y-2">
             {data.weak_areas?.map((w: any) => (
-              <li key={w.concept} className="bg-white p-3 rounded-lg shadow-sm">
+              <li key={w.concept_key ?? w.concept} className="bg-white p-3 rounded-lg shadow-sm">
                 <div className="flex justify-between">
                   <span>{w.concept}</span>
                   <span className="text-gray-500">

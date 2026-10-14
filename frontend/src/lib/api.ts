@@ -73,7 +73,7 @@ api.interceptors.response.use(
 );
 
 // ---- Types & helper functions (keep existing exports) ----
-
+/*
 export interface AskResponse {
   session_id: string;
   answer: string;
@@ -94,6 +94,7 @@ export async function askTutor(payload: {
   const { data } = await api.post<AskResponse>("/tutor/ask", payload);
   return data;
 }
+*/
 
 export async function login(email: string, password: string) {
   const { data } = await api.post("/auth/login", { email, password });

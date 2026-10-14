@@ -71,7 +71,7 @@ class AnswerRequest(BaseModel):
 def sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
-
+'''
 @router.post("/ask")
 async def ask(
     payload: AskRequest,
@@ -102,7 +102,7 @@ async def ask(
         return result
     except ValueError as e:
         raise HTTPException(400, str(e))
-
+'''
 
 @router.post("/answer")
 async def submit_answer(
