@@ -104,9 +104,10 @@ async def _approve_job(job_id: str) -> None:
 
             chapters = (job.parsed_data or {}).get("chapters", [])
             total_chunks = sum(
-                len(s.get("chunks", []))
-                for ch in chapters
+                1 for ch in chapters
                 for s in ch.get("sections", [])
+                for c in s.get("chunks", [])
+                if (c.get("text") or "").strip()
             ) or 1
             processed = 0
 
@@ -130,11 +131,18 @@ async def _approve_job(job_id: str) -> None:
                     db.add(section)
                     await db.flush()
 
-                    chunks = sec_data.get("chunks", [])
+                    raw_chunks = sec_data.get("chunks", [])
+                    # Drop empty-text chunks first so text and embedding stay aligned.
+                    # Teachers may add placeholder chunks that they never fill in —
+                    # we must not create ContentChunk rows with zero-length text.
+                    chunks = [
+                        c for c in raw_chunks
+                        if (c.get("text") or "").strip()
+                    ]
                     if not chunks:
                         continue
 
-                    texts = [c.get("text", "") for c in chunks if c.get("text")]
+                    texts = [str(c.get("text")).strip() for c in chunks]
                     embeddings: list[list[float]] = []
                     for i in range(0, len(texts), EMBED_BATCH):
                         batch = texts[i:i + EMBED_BATCH]
@@ -144,11 +152,12 @@ async def _approve_job(job_id: str) -> None:
                         job.progress = min(99, int((processed / total_chunks) * 100))
                         await db.commit()
 
+                    # Now len(chunks) == len(embeddings), guaranteed.
                     for c, emb in zip(chunks, embeddings):
                         db.add(ContentChunk(
                             section_id=section.id,
                             chunk_type="concept",
-                            text=c.get("text", ""),
+                            text=str(c.get("text")).strip(),
                             page=c.get("page"),
                             embedding=emb,
                             meta={},

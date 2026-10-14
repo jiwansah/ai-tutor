@@ -81,6 +81,37 @@ export default function IngestJobDetail() {
     setParsed({ ...parsed, chapters });
   }
 
+    function updateChunkText(cIdx: number, sIdx: number, chIdx: number, text: string) {
+    if (!parsed) return;
+    const chapters = [...parsed.chapters];
+    const sections = [...chapters[cIdx].sections];
+    const chunks = [...sections[sIdx].chunks];
+    chunks[chIdx] = { ...chunks[chIdx], text };
+    sections[sIdx] = { ...sections[sIdx], chunks };
+    chapters[cIdx] = { ...chapters[cIdx], sections };
+    setParsed({ ...parsed, chapters });
+  }
+
+  function deleteChunk(cIdx: number, sIdx: number, chIdx: number) {
+    if (!parsed) return;
+    const chapters = [...parsed.chapters];
+    const sections = [...chapters[cIdx].sections];
+    const chunks = sections[sIdx].chunks.filter((_, i) => i !== chIdx);
+    sections[sIdx] = { ...sections[sIdx], chunks };
+    chapters[cIdx] = { ...chapters[cIdx], sections };
+    setParsed({ ...parsed, chapters });
+  }
+
+  function addChunk(cIdx: number, sIdx: number) {
+    if (!parsed) return;
+    const chapters = [...parsed.chapters];
+    const sections = [...chapters[cIdx].sections];
+    const page = sections[sIdx].start_page || 1;
+    const chunks = [...sections[sIdx].chunks, { text: "", page }];
+    sections[sIdx] = { ...sections[sIdx], chunks };
+    chapters[cIdx] = { ...chapters[cIdx], sections };
+    setParsed({ ...parsed, chapters });
+  }
   async function handleSave() {
     if (!parsed) return;
     setSaving(true);
@@ -203,6 +234,9 @@ export default function IngestJobDetail() {
                 onDelete={() => deleteChapter(cIdx)}
                 onChangeSectionTitle={(sIdx, t) => updateSectionTitle(cIdx, sIdx, t)}
                 onDeleteSection={(sIdx) => deleteSection(cIdx, sIdx)}
+                onChangeChunkText={(sIdx, chIdx, t) => updateChunkText(cIdx, sIdx, chIdx, t)}
+                onDeleteChunk={(sIdx, chIdx) => deleteChunk(cIdx, sIdx, chIdx)}
+                onAddChunk={(sIdx) => addChunk(cIdx, sIdx)}
               />
             ))}
           </div>
@@ -216,6 +250,7 @@ export default function IngestJobDetail() {
 function ChapterBlock({
   chapter, editable, expanded, onToggle, onChangeTitle, onDelete,
   onChangeSectionTitle, onDeleteSection,
+  onChangeChunkText, onDeleteChunk, onAddChunk,
 }: {
   chapter: ParsedChapter;
   editable: boolean;
@@ -225,14 +260,16 @@ function ChapterBlock({
   onDelete: () => void;
   onChangeSectionTitle: (sIdx: number, t: string) => void;
   onDeleteSection: (sIdx: number) => void;
+  onChangeChunkText: (sIdx: number, chIdx: number, t: string) => void;
+  onDeleteChunk: (sIdx: number, chIdx: number) => void;
+  onAddChunk: (sIdx: number) => void;
 }) {
   const totalChunks = chapter.sections.reduce((n, s) => n + s.chunks.length, 0);
 
   return (
     <div className="rounded-xl border bg-white overflow-hidden">
       <div className="px-4 py-3 flex flex-wrap items-center gap-3">
-        <button onClick={onToggle}
-          className="text-gray-500 hover:text-gray-800 text-sm">
+        <button onClick={onToggle} className="text-gray-500 hover:text-gray-800 text-sm">
           {expanded ? "▼" : "▶"}
         </button>
 
@@ -256,9 +293,7 @@ function ChapterBlock({
         </span>
 
         {editable && (
-          <button onClick={onDelete}
-            className="text-red-500 hover:text-red-700 p-1"
-            aria-label="Delete chapter">
+          <button onClick={onDelete} className="text-red-500 hover:text-red-700 p-1" aria-label="Delete chapter">
             <X className="w-4 h-4" />
           </button>
         )}
@@ -292,31 +327,54 @@ function ChapterBlock({
                 </span>
 
                 {editable && (
-                  <button onClick={() => onDeleteSection(sIdx)}
-                    className="text-red-500 hover:text-red-700 p-1"
-                    aria-label="Delete section">
+                  <button onClick={() => onDeleteSection(sIdx)} className="text-red-500 hover:text-red-700 p-1" aria-label="Delete section">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
 
-              {sec.chunks.length > 0 && (
-                <details className="mt-2 text-xs text-gray-600">
-                  <summary className="cursor-pointer text-emerald-700 hover:text-emerald-900">
-                    Preview chunks
-                  </summary>
-                  <ul className="mt-2 space-y-2">
-                    {sec.chunks.map((c, i) => (
-                      <li key={i} className="rounded-md bg-white border px-3 py-2">
-                        <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">
-                          p. {c.page}
-                        </div>
-                        <div className="whitespace-pre-wrap">{c.text}</div>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
+              {/* Chunks — always visible when expanded, editable when permitted */}
+              <div className="mt-3 space-y-2">
+                {sec.chunks.length === 0 && (
+                  <div className="text-xs text-gray-400 italic">No content in this section</div>
+                )}
+                {sec.chunks.map((c, chIdx) => (
+                  <div key={chIdx} className="rounded-md bg-white border">
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500">
+                      <span>Chunk {chIdx + 1} · p. {c.page}</span>
+                      {editable && (
+                        <button
+                          onClick={() => onDeleteChunk(sIdx, chIdx)}
+                          className="text-red-500 hover:text-red-700 text-xs font-medium"
+                          aria-label={`Delete chunk ${chIdx + 1}`}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                    {editable ? (
+                      <textarea
+                        value={c.text}
+                        onChange={(e) => onChangeChunkText(sIdx, chIdx, e.target.value)}
+                        rows={Math.max(2, Math.min(8, Math.ceil(c.text.length / 80)))}
+                        placeholder="Chunk text…"
+                        className="w-full resize-y px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-b-md"
+                      />
+                    ) : (
+                      <div className="px-3 py-2 text-sm whitespace-pre-wrap">{c.text}</div>
+                    )}
+                  </div>
+                ))}
+
+                {editable && (
+                  <button
+                    onClick={() => onAddChunk(sIdx)}
+                    className="text-xs text-emerald-700 hover:text-emerald-900 hover:underline"
+                  >
+                    + Add chunk
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

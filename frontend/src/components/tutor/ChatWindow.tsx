@@ -16,11 +16,24 @@ export function ChatWindow() {
   const sessionId = useTutorStore((s) => s.sessionId);
   const resetSession = useTutorStore((s) => s.reset);
 
+  // When the user changes mode, start a fresh session.
   useEffect(() => {
     if (sessionId) resetSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
-  // When the user changes mode, start a fresh session.
+
+  // Auto-scroll during streaming and on new messages.
+  const lastMessage = messages[messages.length - 1];
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [
+    messages.length,
+    lastMessage?.content?.length ?? 0,
+    lastMessage?.citations?.length ?? 0,
+    loading,
+  ]);
 
   async function handleSend() {
     if (!input.trim() || loading) return;
