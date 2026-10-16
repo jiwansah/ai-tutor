@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from app.api.v1 import (
     auth, curriculum, tutor, ingest, dashboard, concepts,
-    teacher, teacher_ingest, public, analytics,
+    teacher, teacher_ingest, public, analytics, tutor_sessions,
 )
 
 api_router = APIRouter()
@@ -15,3 +15,4 @@ api_router.include_router(tutor.router, prefix="/tutor", tags=["tutor"])
 api_router.include_router(ingest.router, prefix="/ingest", tags=["ingest"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+api_router.include_router(tutor_sessions.router, prefix="/tutor", tags=["tutor-sessions"])

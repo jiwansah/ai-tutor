@@ -27,11 +27,13 @@ def _parse_uuid(value: str, name: str) -> str:
 async def school_summary(
     school_id: str,
     days: int = Query(30, ge=1, le=365),
+    class_id: str | None = Query(None),
     _: User = Depends(require_teacher_or_admin),
     db: AsyncSession = Depends(get_db),
 ):
     sid = _parse_uuid(school_id, "school_id")
-    return await A.school_summary(db, sid, days)
+    cid = _parse_uuid(class_id, "class_id") if class_id else None
+    return await A.school_summary(db, sid, days, class_id=cid)
 
 
 @router.get("/school/{school_id}/trend")

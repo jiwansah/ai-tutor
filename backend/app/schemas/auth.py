@@ -4,7 +4,10 @@ from app.db.models.user import User, UserRole
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
-
+from app.core.security import (
+    hash_password, verify_password,
+    create_access_token, create_refresh_token, decode_token,
+)
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -21,6 +24,8 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 class UserOut(BaseModel):
     id: UUID

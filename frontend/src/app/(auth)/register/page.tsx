@@ -52,8 +52,8 @@ export default function RegisterPage() {
         payload.school_id = schoolId;
         payload.class_id = classId;
       }
-      const res = await register(payload);
-      setAuth(res.access_token, res.user);
+      const res = await register({ email, password, full_name: fullName, role });
+      setAuth(res.access_token, res.user, res.refresh_token);
       toast.success("Account created!");
       const landing = role === "teacher" || role === "admin" ? "/teacher" : "/tutor";
       router.push(landing);

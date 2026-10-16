@@ -3,8 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.db.models.user import User, UserRole
 from app.repositories.user_repo import UserRepository
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserOut
-from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
+from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserOut, RefreshRequest
+from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
 from sqlalchemy import select
 from app.db.models.curriculum import Class as ClassModel
 from uuid import UUID
@@ -13,6 +13,30 @@ from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
 
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_tokens(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    """Exchange a valid refresh token for a fresh access + refresh pair."""
+    try:
+        decoded = decode_token(payload.refresh_token)
+        if decoded.get("type") != "refresh":
+            raise ValueError("wrong token type")
+        user_id = decoded["sub"]
+    except Exception:
+        raise HTTPException(401, "Invalid or expired refresh token")
+
+    user = (await db.execute(
+        select(User).where(User.id == user_id)
+    )).scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(401, "User not found or inactive")
+
+    return TokenResponse(
+        access_token=create_access_token(str(user.id), user.role.value),
+        refresh_token=create_refresh_token(str(user.id)),
+        user=UserOut.model_validate(user),
+    )
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
 async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)):

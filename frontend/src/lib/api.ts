@@ -59,18 +59,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-api.interceptors.response.use(
-  (r) => r,
-  (error) => {
-    if (error.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("access_token");
-      if (!window.location.pathname.startsWith("/login")) {
-        window.location.href = "/login";
-      }
-    }
-    return Promise.reject(error);
-  }
-);
 
 // ---- Types & helper functions (keep existing exports) ----
 /*
@@ -132,3 +120,93 @@ export async function listPublicClasses(schoolId: string) {
   const { data } = await api.get(`/public/schools/${schoolId}/classes`);
   return data as { id: string; grade: number }[];
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Silent token refresh on 401
+// ─────────────────────────────────────────────────────────────────────
+
+let isRefreshing = false;
+let pendingRequests: Array<(token: string | null) => void> = [];
+
+async function tryRefresh(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  const refresh = localStorage.getItem("refresh_token");
+  if (!refresh) return null;
+
+  try {
+    const res = await axios.post(`${API_URL}/auth/refresh`, {
+      refresh_token: refresh,
+    });
+    const { access_token, refresh_token } = res.data;
+    localStorage.setItem("access_token", access_token);
+    if (refresh_token) localStorage.setItem("refresh_token", refresh_token);
+    return access_token;
+  } catch {
+    return null;
+  }
+}
+
+function forceLogout() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  if (!window.location.pathname.startsWith("/login")) {
+    window.location.href = "/login";
+  }
+}
+
+api.interceptors.response.use(
+  (r) => r,
+  async (error) => {
+    const original = error.config;
+
+    // Only handle 401s, and only once per request
+    if (
+      error.response?.status !== 401 ||
+      original._retry ||
+      typeof window === "undefined"
+    ) {
+      return Promise.reject(error);
+    }
+
+    // Don't try to refresh the refresh call itself
+    if (original.url?.includes("/auth/refresh")) {
+      forceLogout();
+      return Promise.reject(error);
+    }
+
+    original._retry = true;
+
+    // If a refresh is already in flight, queue this request
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        pendingRequests.push((token) => {
+          if (token) {
+            original.headers.Authorization = `Bearer ${token}`;
+            resolve(api(original));
+          } else {
+            reject(error);
+          }
+        });
+      });
+    }
+
+    // Start a refresh
+    isRefreshing = true;
+    const newToken = await tryRefresh();
+    isRefreshing = false;
+
+    // Wake up all queued requests
+    pendingRequests.forEach((cb) => cb(newToken));
+    pendingRequests = [];
+
+    if (newToken) {
+      original.headers.Authorization = `Bearer ${newToken}`;
+      return api(original);
+    }
+
+    // Refresh failed — really log out
+    forceLogout();
+    return Promise.reject(error);
+  }
+);

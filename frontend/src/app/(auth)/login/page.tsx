@@ -31,7 +31,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await login(email, password);
-      setAuth(res.access_token, res.user);
+      setAuth(res.access_token, res.user, res.refresh_token);
       toast.success(`Welcome, ${res.user.full_name}`);
       router.push(landingFor(res.user.role));
     } catch (e: any) {

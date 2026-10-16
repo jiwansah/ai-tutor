@@ -11,7 +11,13 @@ export interface StudyScope {
   chapterId: string | null;
 }
 
-export function ChapterPicker({ onChange }: { onChange: (s: StudyScope) => void }) {
+export function ChapterPicker({
+  value,
+  onChange,
+}: {
+  value?: StudyScope | null;
+  onChange: (s: StudyScope) => void;
+}) {
   const { user } = useAuth();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -22,6 +28,7 @@ export function ChapterPicker({ onChange }: { onChange: (s: StudyScope) => void 
   const classId = user?.class_id;
   const isStudent = user?.role === "student";
 
+  // Load subjects on mount
   useEffect(() => {
     if (!isStudent || !classId) return;
     setLoading(true);
@@ -31,23 +38,34 @@ export function ChapterPicker({ onChange }: { onChange: (s: StudyScope) => void 
       .finally(() => setLoading(false));
   }, [classId, isStudent]);
 
+  // Sync from external `value` when a session is loaded
+  useEffect(() => {
+    if (!value) return;
+    setSubjectId(value.subjectId ?? "");
+    setChapterId(value.chapterId ?? "");
+  }, [value?.subjectId, value?.chapterId]);
+
+  // Load chapters whenever subject changes
   useEffect(() => {
     setChapterId("");
     setChapters([]);
-    onChange({ subjectId: subjectId || null, chapterId: null });
-    if (!subjectId) return;
+    if (!subjectId) {
+      onChange({ subjectId: null, chapterId: null });
+      return;
+    }
     api.get(`/curriculum/chapters/${subjectId}`)
       .then((r) => setChapters(r.data))
       .catch(() => setChapters([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectId]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+  // Sync chapter selection back to parent when it changes
+  useEffect(() => {
+    onChange({ subjectId: subjectId || null, chapterId: chapterId || null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectId, chapterId]);
 
   if (!isStudent || !classId) return null;
-
-  function handleChapterChange(id: string) {
-    setChapterId(id);
-    onChange({ subjectId: subjectId || null, chapterId: id || null });
-  }
 
   return (
     <>
@@ -69,7 +87,7 @@ export function ChapterPicker({ onChange }: { onChange: (s: StudyScope) => void 
 
       <select
         value={chapterId}
-        onChange={(e) => handleChapterChange(e.target.value)}
+        onChange={(e) => setChapterId(e.target.value)}
         disabled={!subjectId}
         aria-label="Chapter"
         className="rounded-lg border border-gray-300 px-2.5 py-2 text-sm bg-white min-h-[40px] flex-1 min-w-[120px] disabled:opacity-60"

@@ -3,8 +3,9 @@ import { persist } from "zustand/middleware";
 
 interface AuthState {
   token: string | null;
+  refreshToken: string | null;
   user: any | null;
-  setAuth: (token: string, user: any) => void;
+  setAuth: (token: string, user: any, refreshToken?: string) => void;
   logout: () => void;
 }
 
@@ -12,19 +13,40 @@ export const useAuth = create<AuthState>()(
   persist(
     (set) => ({
       token: null,
+      refreshToken: null,
       user: null,
-      setAuth: (token, user) => {
-        if (typeof window !== "undefined") localStorage.setItem("access_token", token);
-        set({ token, user });
+
+      setAuth: (token, user, refreshToken) => {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("access_token", token);
+          if (refreshToken) {
+            localStorage.setItem("refresh_token", refreshToken);
+          }
+        }
+        set({
+          token,
+          user,
+          refreshToken: refreshToken ?? (typeof window !== "undefined"
+            ? localStorage.getItem("refresh_token")
+            : null),
+        });
       },
+
       logout: () => {
-        if (typeof window !== "undefined") localStorage.removeItem("access_token");
-        set({ token: null, user: null });
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+        }
+        set({ token: null, refreshToken: null, user: null });
       },
     }),
     { name: "auth-store" },
   ),
 );
+
+// ─────────────────────────────────────────────────────────────────────
+// Tutor store — unchanged, but kept for reference
+// ─────────────────────────────────────────────────────────────────────
 
 export interface Citation {
   chapter: string;
@@ -44,18 +66,17 @@ export interface ChatMessage {
   content: string;
   citations?: Citation[];
   verification?: Verification;
-  awaitingAnswers?: boolean;    // NEW
 }
 
 interface TutorState {
   sessionId: string | null;
   messages: ChatMessage[];
-  awaitingAnswers: boolean;                                      // NEW
+  awaitingAnswers: boolean;
   addMessage: (m: ChatMessage) => void;
   appendToLastTutor: (text: string) => void;
   setCitationsOnLastTutor: (citations: Citation[]) => void;
   setVerificationOnLastTutor: (v: Verification) => void;
-  setAwaitingAnswers: (v: boolean) => void;                      // NEW
+  setAwaitingAnswers: (v: boolean) => void;
   setSession: (id: string) => void;
   reset: () => void;
 }

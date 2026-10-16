@@ -17,9 +17,96 @@ from app.db.models.analytics import AnalyticsEvent, DailyRollup
 PII_FIELD_BLOCKLIST = {"email", "full_name", "password", "phone", "address", "chat", "text"}
 
 
+# ─────────────────────────────────────────────────────────────────────
+# Resolve concept_key → human-readable label
+# ─────────────────────────────────────────────────────────────────────
+
+async def _resolve_concept_labels(
+    db: AsyncSession, keys: list[str]
+) -> dict[str, str]:
+    """
+    Map raw concept keys to friendly display names.
+
+    Supported key shapes:
+      - "chapter:<uuid>"  → chapter.title
+      - "section:<uuid>"  → section.title
+      - "subject:<uuid>"  → subject.name
+      - "solving_linear_eq" (real concept key) → concepts.name
+      - anything else → returned as-is
+    """
+    from app.db.models.curriculum import Chapter, Section, Subject
+    from app.db.models.concept import Concept
+
+    out: dict[str, str] = {}
+    chapter_ids, section_ids, subject_ids, concept_keys = [], [], [], []
+
+    for key in keys:
+        if not key:
+            continue
+        if key.startswith("chapter:"):
+            chapter_ids.append(key.split(":", 1)[1])
+        elif key.startswith("section:"):
+            section_ids.append(key.split(":", 1)[1])
+        elif key.startswith("subject:"):
+            subject_ids.append(key.split(":", 1)[1])
+        else:
+            concept_keys.append(key)
+
+    if chapter_ids:
+        rows = (await db.execute(
+            select(Chapter.id, Chapter.title).where(Chapter.id.in_(chapter_ids))
+        )).all()
+        for cid, title in rows:
+            out[f"chapter:{cid}"] = title
+
+    if section_ids:
+        rows = (await db.execute(
+            select(Section.id, Section.title).where(Section.id.in_(section_ids))
+        )).all()
+        for sid, title in rows:
+            out[f"section:{sid}"] = title
+
+    if subject_ids:
+        rows = (await db.execute(
+            select(Subject.id, Subject.name).where(Subject.id.in_(subject_ids))
+        )).all()
+        for sid, name in rows:
+            out[f"subject:{sid}"] = name
+
+    if concept_keys:
+        rows = (await db.execute(
+            select(Concept.key, Concept.name).where(Concept.key.in_(concept_keys))
+        )).all()
+        for key, name in rows:
+            out[key] = name
+
+    # Fall back to the raw key for anything that couldn't be resolved
+    for key in keys:
+        out.setdefault(key, key)
+    return out
+
+
 def _sanitize_extra(extra: dict) -> dict:
     return {k: v for k, v in (extra or {}).items() if k.lower() not in PII_FIELD_BLOCKLIST}
 
+LEGACY_MODE_MAP = {
+    "teacher":   "teaching",
+    "socratic":  "teaching",
+    "hint":      "teaching",
+    "doubt":     "teaching",
+    "revision":  "teaching",
+    "practice":  "quiz",
+    "homework":  "quiz",
+}
+
+
+def _normalize_mode_counts(rows: list[tuple[str, int]]) -> dict[str, int]:
+    """Collapse legacy mode names into the current three: teaching, quiz, exam."""
+    out: dict[str, int] = {}
+    for mode, count in rows:
+        key = LEGACY_MODE_MAP.get(mode, mode)
+        out[key] = out.get(key, 0) + count
+    return out
 
 async def log_event(
     db: AsyncSession,
@@ -61,44 +148,45 @@ async def log_event(
 # School-level summary
 # ------------------------------------------------------------------
 
-async def school_summary(db: AsyncSession, school_id, days: int = 30) -> dict:
+async def school_summary(
+    db: AsyncSession, school_id, days: int = 30, class_id=None
+) -> dict:
     since = datetime.now(timezone.utc) - timedelta(days=days)
 
+    def _base(stmt):
+        stmt = stmt.where(
+            AnalyticsEvent.school_id == school_id,
+            AnalyticsEvent.created_at >= since,
+        )
+        if class_id:
+            stmt = stmt.where(AnalyticsEvent.class_id == class_id)
+        return stmt
+
     active = (await db.execute(
-        select(func.count(distinct(AnalyticsEvent.student_id)))
-        .where(AnalyticsEvent.school_id == school_id,
-               AnalyticsEvent.created_at >= since,
-               AnalyticsEvent.student_id.isnot(None))
+        _base(select(func.count(distinct(AnalyticsEvent.student_id)))
+              .where(AnalyticsEvent.student_id.isnot(None)))
     )).scalar() or 0
 
     questions = (await db.execute(
-        select(func.count()).select_from(AnalyticsEvent)
-        .where(AnalyticsEvent.school_id == school_id,
-               AnalyticsEvent.created_at >= since,
-               AnalyticsEvent.event_type == "question_asked")
+        _base(select(func.count()).select_from(AnalyticsEvent)
+              .where(AnalyticsEvent.event_type == "question_asked"))
     )).scalar() or 0
 
     correct = (await db.execute(
-        select(func.count()).select_from(AnalyticsEvent)
-        .where(AnalyticsEvent.school_id == school_id,
-               AnalyticsEvent.created_at >= since,
-               AnalyticsEvent.event_type == "answer_evaluated",
-               AnalyticsEvent.is_correct.is_(True))
+        _base(select(func.count()).select_from(AnalyticsEvent)
+              .where(AnalyticsEvent.event_type == "answer_evaluated",
+                     AnalyticsEvent.is_correct.is_(True)))
     )).scalar() or 0
 
     verified = (await db.execute(
-        select(func.count()).select_from(AnalyticsEvent)
-        .where(AnalyticsEvent.school_id == school_id,
-               AnalyticsEvent.created_at >= since,
-               AnalyticsEvent.was_verified.is_(True))
+        _base(select(func.count()).select_from(AnalyticsEvent)
+              .where(AnalyticsEvent.was_verified.is_(True)))
     )).scalar() or 0
 
     mode_rows = (await db.execute(
-        select(AnalyticsEvent.mode, func.count())
-        .where(AnalyticsEvent.school_id == school_id,
-               AnalyticsEvent.created_at >= since,
-               AnalyticsEvent.mode.isnot(None))
-        .group_by(AnalyticsEvent.mode)
+        _base(select(AnalyticsEvent.mode, func.count())
+              .where(AnalyticsEvent.mode.isnot(None))
+              .group_by(AnalyticsEvent.mode))
     )).all()
 
     return {
@@ -109,7 +197,7 @@ async def school_summary(db: AsyncSession, school_id, days: int = 30) -> dict:
         "answers_verified": verified,
         "correct_rate": round(correct / questions, 3) if questions else 0.0,
         "verified_rate": round(verified / questions, 3) if questions else 0.0,
-        "mode_distribution": {m: c for m, c in mode_rows},
+        "mode_distribution": _normalize_mode_counts(mode_rows),
     }
 
 
@@ -145,6 +233,10 @@ async def class_summary(db: AsyncSession, class_id, days: int = 30) -> dict:
         .limit(10)
     )).all()
 
+    # Resolve keys → labels (one batch query)
+    all_keys = [c for c, _ in top_rows]
+    label_map = await _resolve_concept_labels(db, all_keys)
+
     # Weak concepts — correct_rate per concept, using CASE for boolean->int
     correct_as_int = case((AnalyticsEvent.is_correct.is_(True), 1), else_=0)
 
@@ -161,15 +253,19 @@ async def class_summary(db: AsyncSession, class_id, days: int = 30) -> dict:
         .group_by(AnalyticsEvent.concept_key)
     )).all()
 
+    # k-anonymity threshold. Classrooms often have fewer than 5 attempts per
+    # concept in a 30-day window, so 3 is a safer floor for a demo/school.
+    MIN_ATTEMPTS = 3
+
     weak = []
     for concept, total, correct in weak_rows:
         if not total:
             continue
         rate = (correct or 0) / total
-        # k-anonymity: only include if enough attempts
-        if total >= 5:
+        if total >= MIN_ATTEMPTS:
             weak.append({
-                "concept": concept,
+                "concept": concept,  # raw key, resolved later
+                "concept_key": concept,
                 "attempts": total,
                 "correct_rate": round(rate, 3),
             })
@@ -180,8 +276,21 @@ async def class_summary(db: AsyncSession, class_id, days: int = 30) -> dict:
         "period_days": days,
         "active_students": active,
         "questions_asked": questions,
-        "top_concepts": [{"concept": c, "count": n} for c, n in top_rows],
-        "weak_concepts": weak,
+        "top_concepts": [
+            {
+                "concept": label_map.get(c, c),
+                "concept_key": c,
+                "count": n,
+            }
+            for c, n in top_rows
+        ],
+        "weak_concepts": [
+            {
+                **w,
+                "concept": label_map.get(w["concept_key"], w["concept_key"]),
+            }
+            for w in weak
+        ],
     }
 
 

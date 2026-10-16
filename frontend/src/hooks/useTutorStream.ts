@@ -57,15 +57,55 @@ export function useTutorStream() {
             ? localStorage.getItem("access_token")
             : null;
 
-        const res = await fetch(`${API_URL}/tutor/ask/stream`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
+            async function doFetch(authToken: string | null) {
+              return fetch(`${API_URL}/tutor/ask/stream`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+              });
+            }
+
+            let res = await doFetch(token);
+
+            // If the token expired, try one refresh, then retry
+            if (res.status === 401) {
+              const refresh = typeof window !== "undefined"
+                ? localStorage.getItem("refresh_token")
+                : null;
+              if (refresh) {
+                try {
+                  const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ refresh_token: refresh }),
+                  });
+                  if (refreshRes.ok) {
+                    const data = await refreshRes.json();
+                    localStorage.setItem("access_token", data.access_token);
+                    if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
+                    res = await doFetch(data.access_token);
+                  }
+                } catch {
+                  // fall through to error handling below
+                }
+              }
+
+              if (res.status === 401) {
+                localStorage.removeItem("access_token");
+                localStorage.removeItem("refresh_token");
+                window.location.href = "/login";
+                throw new Error("Session expired");
+              }
+            }
+
+            if (!res.ok || !res.body) {
+              const text = await res.text().catch(() => "");
+              throw new Error(text || `HTTP ${res.status}`);
+            }
 
         if (!res.ok || !res.body) {
           const text = await res.text().catch(() => "");

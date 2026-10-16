@@ -40,7 +40,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (!schoolId) return;
     setLoading(true);
-    Promise.all([schoolSummary(schoolId, days), schoolTrend(schoolId, 14)])
+    Promise.all([schoolSummary(schoolId, days), schoolTrend(schoolId, Math.min(days, 30))])
       .then(([s, t]) => { setSummary(s); setTrend(t); })
       .catch((e) => toast.error(e?.response?.data?.detail || "Failed to load school analytics"))
       .finally(() => setLoading(false));
