@@ -11,20 +11,32 @@ export interface AskOptions {
   section_id?: string;
 }
 
+/**
+ * Heuristic: does the text look like an answer to a pending assessment,
+ * rather than a fresh question?
+ */
 function looksLikeAnswer(text: string): boolean {
-  const t = text.trim();
+  const t = (text || "").trim();
   if (!t) return false;
-  // If it starts with a question word or has "?", it's a new question
-  if (/^(?:what|why|how|who|when|where|which|can you|explain|tell me|help|please)/i.test(t)) {
+
+  // Question-shaped → not an answer
+  if (/^(?:what|why|how|who|when|where|which|can you|could you|explain|tell me|help|please|show me)/i.test(t)) {
     return false;
   }
   if (t.includes("?")) return false;
-  // If it looks like "1 A, 2 B" or "x=4" — treat as an answer
-  if (/^\s*\d+\s*[\.")\-:]?\s*(?:[A-Da-d]|\d|[\w\u0900-\u097F])/m.test(t)) {
-    return true;
-  }
-  // Short single-line responses are likely answers
-  if (t.length < 120) return true;
+
+  // MCQ answer pattern: "1 A, 2 B, 3 C" or "1) A  2) B"
+  if (/^\s*\d+\s*[.)\-:]?\s*[A-Da-d]\b/m.test(t)) return true;
+
+  // Value answer pattern: "1. x=4\n2. y=5" or "1 x=4"
+  if (/^\s*\d+\s*[.)\-:]?\s*.+=.+/m.test(t)) return true;
+
+  // Bare letters: "A, B, C" or "AB C"
+  if (/^\s*[A-Da-d](?:\s*[,\s]\s*[A-Da-d])*\s*$/.test(t)) return true;
+
+  // Short single-line text under 300 chars without paragraph breaks
+  if (t.length < 300 && !t.includes("\n\n")) return true;
+
   return false;
 }
 
@@ -37,19 +49,21 @@ export function useTutor() {
     appendToLastTutor,
     setCitationsOnLastTutor,
     setVerificationOnLastTutor,
+    // ─── Read & write awaiting flag from the shared Zustand store ───
+    awaitingAnswers,
+    setAwaitingAnswers,
   } = useTutorStore();
+
   const { stream, isStreaming } = useTutorStream();
   const [loading, setLoading] = useState(false);
-  const [awaitingAnswers, setAwaitingAnswers] = useState(false);
 
   async function ask(question: string, opts: AskOptions = {}) {
     if (!question.trim()) return;
 
-    // If the tutor is waiting for answers, route this to the grader
-        // If the tutor is waiting for answers, route to the grader —
-    // BUT only if the message looks like an answer, not a new question.
+    // If the tutor is waiting for answers AND the input looks like an answer,
+    // route to the grading endpoint instead of the streaming chat endpoint.
     if (awaitingAnswers && sessionId && looksLikeAnswer(question)) {
-      await submitAnswer(question, opts);
+      await submitAnswer(question);
       return;
     }
 
@@ -61,18 +75,20 @@ export function useTutor() {
       {
         question,
         session_id: sessionId ?? undefined,
-        mode: opts.mode ?? "teacher",
+        mode: opts.mode ?? "teaching",
         subject_id: opts.subject_id,
         chapter_id: opts.chapter_id,
         section_id: opts.section_id,
       },
       {
-        onSession: (id) => { if (!sessionId) setSession(id); },
+        onSession: (id) => {
+          if (!sessionId) setSession(id);
+        },
         onToken: (text) => appendToLastTutor(text),
         onCitations: (citations: Citation[]) => setCitationsOnLastTutor(citations),
         onVerification: (v: Verification) => setVerificationOnLastTutor(v),
         onDone: ({ awaiting_answers }) => {
-          // The tutor just asked questions → next user input is an answer
+          // The stream knows whether the tutor just asked questions.
           setAwaitingAnswers(!!awaiting_answers);
           setLoading(false);
         },
@@ -83,7 +99,7 @@ export function useTutor() {
     setLoading(false);
   }
 
-  async function submitAnswer(answer: string, opts: AskOptions) {
+  async function submitAnswer(answer: string) {
     if (!sessionId) return;
 
     addMessage({ role: "user", content: answer });
@@ -93,7 +109,7 @@ export function useTutor() {
     try {
       const { data } = await api.post("/tutor/answer", {
         session_id: sessionId,
-        question: "answer to quiz",
+        question: "answer",
         student_answer: answer,
       });
 
@@ -119,16 +135,21 @@ export function useTutor() {
       }
 
       appendToLastTutor(body);
-
-      // After grading, stop waiting for more answers
       setAwaitingAnswers(false);
     } catch (e: any) {
-      appendToLastTutor("Sorry, I couldn't grade that. Please try again.");
-      setAwaitingAnswers(false);
+      appendToLastTutor(
+        e?.response?.data?.detail ||
+          "Sorry, I couldn't grade that. Please try again."
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  return { messages, ask, loading: loading || isStreaming, awaitingAnswers };
+  return {
+    messages,
+    ask,
+    loading: loading || isStreaming,
+    awaitingAnswers,
+  };
 }
